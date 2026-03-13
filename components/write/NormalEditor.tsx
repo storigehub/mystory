@@ -8,26 +8,60 @@ import { useWhisperSTT } from '@/lib/use-whisper-stt';
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
+/* ─────────────────────────────────────────
+   블록 타입 — 텍스트 | 사진
+   prose 직렬화: 텍스트 사이에 [PHOTO:id] 마커
+───────────────────────────────────────── */
+type TextBlock = { type: 'text'; bid: string; content: string };
+type PhotoBlock = { type: 'photo'; bid: string; photoId: string };
+type EditorBlock = TextBlock | PhotoBlock;
+
+const PHOTO_SPLIT = /(\[PHOTO:[a-z0-9]+\])/;
+const PHOTO_MATCH = /\[PHOTO:([a-z0-9]+)\]/;
+
+function proseToBlocks(prose: string): EditorBlock[] {
+  if (!prose) return [{ type: 'text', bid: 'tb-0', content: '' }];
+  const parts = prose.split(PHOTO_SPLIT);
+  const blocks: EditorBlock[] = [];
+  let tc = 0;
+  for (const part of parts) {
+    const m = part.match(PHOTO_MATCH);
+    if (m) {
+      blocks.push({ type: 'photo', bid: `pb-${m[1]}`, photoId: m[1] });
+    } else {
+      blocks.push({ type: 'text', bid: `tb-${tc++}`, content: part });
+    }
+  }
+  if (blocks[0]?.type !== 'text') blocks.unshift({ type: 'text', bid: 'tb-s', content: '' });
+  if (blocks[blocks.length - 1]?.type !== 'text') blocks.push({ type: 'text', bid: 'tb-e', content: '' });
+  return blocks;
+}
+
+function blocksToProse(blocks: EditorBlock[]): string {
+  return blocks.map((b) => (b.type === 'text' ? b.content : `[PHOTO:${b.photoId}]`)).join('');
+}
+
+function totalCharCount(blocks: EditorBlock[]): number {
+  return blocks
+    .filter((b): b is TextBlock => b.type === 'text')
+    .reduce((s, b) => s + b.content.length, 0);
+}
+
+/* ─── 아이콘 ─── */
+function MicIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <rect x="9" y="2" width="6" height="12" rx="3" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M5 10a7 7 0 0014 0M12 18v4m-3 0h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
 function PhotoIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
       <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.5" />
       <circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" strokeWidth="1.5" />
       <path d="M21 15l-5-5L5 21" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function MicIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-      <rect x="9" y="2" width="6" height="12" rx="3" stroke="currentColor" strokeWidth="1.5" />
-      <path
-        d="M5 10a7 7 0 0014 0M12 18v4m-3 0h6"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
     </svg>
   );
 }
@@ -40,117 +74,170 @@ interface NormalEditorProps {
 export default function NormalEditor({ chapter, chapterIdx }: NormalEditorProps) {
   const { state, setProse, addPhoto, removePhoto, updatePhotoCaption } = useBook();
   const [showGuide, setShowGuide] = useState(!chapter.prose?.length);
-  const [isListening, setIsListening] = useState(false); // browser STT
+  const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
 
+  /* ── 블록 상태 ── chapter.id 바뀔 때만 재파싱 */
+  const [blocks, setBlocks] = useState<EditorBlock[]>(() => proseToBlocks(chapter.prose || ''));
+  useEffect(() => {
+    setBlocks(proseToBlocks(chapter.prose || ''));
+    setShowGuide(!chapter.prose?.length);
+    activeBidRef.current = 'tb-0';
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chapter.id]);
+
   const fileRef = useRef<HTMLInputElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const chapterIdxRef = useRef(chapterIdx);
+  const activeBidRef = useRef<string>(blocks[0]?.bid ?? 'tb-0');
   const recognitionRef = useRef<any>(null);
   const prevTranscriptRef = useRef('');
-  const chapterIdxRef = useRef(chapterIdx);
+  const taRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
 
   const fontPreset = FONT_SIZE_PRESETS[state.fontSize];
   const hint = getHint(chapter.tid);
 
-  useEffect(() => {
-    chapterIdxRef.current = chapterIdx;
-  }, [chapterIdx]);
+  useEffect(() => { chapterIdxRef.current = chapterIdx; }, [chapterIdx]);
 
-  // Auto-grow textarea on mount
-  useEffect(() => {
-    const ta = textareaRef.current;
-    if (ta) {
-      ta.style.height = 'auto';
-      ta.style.height = Math.max(350, ta.scrollHeight) + 'px';
-    }
-  }, [chapter.id]);
+  /* ── textarea auto-grow ── */
+  const growTA = (bid: string) => {
+    const ta = taRefs.current[bid];
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = Math.max(120, ta.scrollHeight) + 'px';
+  };
 
-  // ── Whisper STT ──
-  const onWhisperTranscribed = useCallback(
-    (text: string) => {
-      const current = chapter.prose || '';
-      const sep = current && !current.endsWith('\n') ? '\n\n' : '';
-      setProse(chapterIdxRef.current, current + sep + text);
-      if (showGuide) setShowGuide(false);
-      // 커서 이동
-      setTimeout(() => {
-        const ta = textareaRef.current;
-        if (ta) {
-          ta.focus();
-          ta.selectionStart = ta.selectionEnd = ta.value.length;
-          ta.style.height = 'auto';
-          ta.style.height = Math.max(350, ta.scrollHeight) + 'px';
-        }
-      }, 50);
-    },
-    [chapter.prose, setProse, showGuide]
-  );
+  /* ── 텍스트 블록 업데이트 ── */
+  const updateTextBlock = useCallback((bid: string, content: string) => {
+    setBlocks((prev) => {
+      const next = prev.map((b) => (b.bid === bid && b.type === 'text' ? { ...b, content } : b));
+      setProse(chapterIdxRef.current, blocksToProse(next));
+      return next;
+    });
+    setShowGuide(false);
+  }, [setProse]);
+
+  /* ── 사진 삽입: 특정 텍스트 블록 뒤에 ── */
+  const insertPhotoAfterBlock = useCallback((bid: string, photoId: string) => {
+    setBlocks((prev) => {
+      const idx = prev.findIndex((b) => b.bid === bid);
+      const at = idx === -1 ? prev.length - 1 : idx;
+      const newBlocks = [...prev];
+      newBlocks.splice(at + 1, 0,
+        { type: 'photo', bid: `pb-${photoId}`, photoId } as PhotoBlock,
+        { type: 'text', bid: `tb-${uid()}`, content: '' } as TextBlock,
+      );
+      setProse(chapterIdxRef.current, blocksToProse(newBlocks));
+      return newBlocks;
+    });
+  }, [setProse]);
+
+  /* ── 사진 블록 삭제 ── */
+  const removePhotoBlock = useCallback((photoBid: string, photoId: string) => {
+    setBlocks((prev) => {
+      const idx = prev.findIndex((b) => b.bid === photoBid);
+      if (idx === -1) return prev;
+      const nb = [...prev];
+      const prevB = nb[idx - 1];
+      const nextB = nb[idx + 1];
+      if (prevB?.type === 'text' && nextB?.type === 'text') {
+        nb.splice(idx - 1, 3, { type: 'text', bid: prevB.bid, content: prevB.content + nextB.content } as TextBlock);
+      } else {
+        nb.splice(idx, 1);
+      }
+      removePhoto(chapterIdxRef.current, photoId);
+      setProse(chapterIdxRef.current, blocksToProse(nb));
+      return nb;
+    });
+  }, [removePhoto, setProse]);
+
+  /* ── 파일 선택 ── */
+  const onFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const photoId = uid();
+      addPhoto(chapterIdxRef.current, { id: photoId, data: ev.target?.result as string, caption: '' });
+      insertPhotoAfterBlock(activeBidRef.current, photoId);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleAddPhoto = (bid: string) => {
+    activeBidRef.current = bid;
+    fileRef.current?.click();
+  };
+
+  /* ── Whisper STT → 활성 블록에 텍스트 추가 ── */
+  const onWhisperTranscribed = useCallback((text: string) => {
+    const bid = activeBidRef.current;
+    setBlocks((prev) => {
+      const next = prev.map((b) => {
+        if (b.bid !== bid || b.type !== 'text') return b;
+        const sep = b.content && !b.content.endsWith('\n') ? '\n\n' : '';
+        return { ...b, content: b.content + sep + text };
+      });
+      setProse(chapterIdxRef.current, blocksToProse(next));
+      return next;
+    });
+    setShowGuide(false);
+    setTimeout(() => growTA(bid), 50);
+  }, [setProse]);
 
   const whisper = useWhisperSTT(state.sttMode === 'whisper', onWhisperTranscribed);
-
-  // 복합 활성 상태
   const isVoiceActive = isListening || whisper.isRecording || whisper.isTranscribing;
 
-  // ── Browser STT 초기화 ──
+  /* ── Browser STT 초기화 ── */
   useEffect(() => {
     if (state.sttMode !== 'browser') return;
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) return;
     const r = new SR();
-    r.lang = 'ko-KR';
-    r.continuous = true;
-    r.interimResults = true;
+    r.lang = 'ko-KR'; r.continuous = true; r.interimResults = true;
     r.onresult = (e: any) => {
-      let final = '';
-      let interim = '';
+      let fin = '', intr = '';
       for (let i = 0; i < e.results.length; i++) {
         const t = e.results[i][0].transcript;
-        if (e.results[i].isFinal) final += t;
-        else interim += t;
+        e.results[i].isFinal ? (fin += t) : (intr += t);
       }
-      setTranscript(final + interim);
+      setTranscript(fin + intr);
     };
-    r.onerror = (e: any) => {
-      if (e.error !== 'aborted') console.warn('STT:', e.error);
-      setIsListening(false);
-    };
-    r.onend = () => {
-      setIsListening(false);
-    };
+    r.onerror = (e: any) => { if (e.error !== 'aborted') console.warn('STT:', e.error); setIsListening(false); };
+    r.onend = () => setIsListening(false);
     recognitionRef.current = r;
     return () => { try { r.abort(); } catch {} };
   }, [state.sttMode]);
 
-  // Browser STT: 녹음 종료 시 텍스트 추가
+  /* Browser STT → 활성 블록에 추가 */
   useEffect(() => {
     if (!isListening && transcript && transcript !== prevTranscriptRef.current) {
       const text = transcript.trim();
       if (text) {
-        const current = chapter.prose || '';
-        const sep = current && !current.endsWith('\n') ? '\n\n' : '';
-        setProse(chapterIdxRef.current, current + sep + text);
-        if (showGuide) setShowGuide(false);
-        setTimeout(() => {
-          const ta = textareaRef.current;
-          if (ta) {
-            ta.focus();
-            ta.selectionStart = ta.selectionEnd = ta.value.length;
-          }
-        }, 50);
+        const bid = activeBidRef.current;
+        setBlocks((prev) => {
+          const next = prev.map((b) => {
+            if (b.bid !== bid || b.type !== 'text') return b;
+            const sep = b.content && !b.content.endsWith('\n') ? '\n\n' : '';
+            return { ...b, content: b.content + sep + text };
+          });
+          setProse(chapterIdxRef.current, blocksToProse(next));
+          return next;
+        });
+        setShowGuide(false);
+        setTimeout(() => growTA(bid), 50);
       }
       prevTranscriptRef.current = transcript;
     }
-  }, [isListening, transcript]);
+  }, [isListening, transcript, setProse]);
 
   const toggleVoice = () => {
     if (state.sttMode === 'browser') {
       if (!recognitionRef.current) return;
       if (isListening) {
-        try { recognitionRef.current.stop(); } catch {}
-        setIsListening(false);
+        try { recognitionRef.current.stop(); } catch {} setIsListening(false);
       } else {
-        setTranscript('');
-        prevTranscriptRef.current = '';
+        setTranscript(''); prevTranscriptRef.current = '';
         try { recognitionRef.current.start(); setIsListening(true); } catch {}
       }
     } else if (state.sttMode === 'whisper') {
@@ -158,104 +245,49 @@ export default function NormalEditor({ chapter, chapterIdx }: NormalEditorProps)
     }
   };
 
-  const onChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setProse(chapterIdxRef.current, e.target.value);
-    if (showGuide) setShowGuide(false);
-    const ta = e.target;
-    ta.style.height = 'auto';
-    ta.style.height = Math.max(350, ta.scrollHeight) + 'px';
-  };
+  const charCount = totalCharCount(blocks);
+  const micLabel = whisper.isTranscribing ? '전사 중...' : isVoiceActive ? '중지' : '녹음';
 
-  const onFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      addPhoto(chapterIdxRef.current, {
-        id: uid(),
-        data: ev.target?.result as string,
-        caption: '',
-      });
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  };
-
-  const toolBtnStyle = (active?: boolean): React.CSSProperties => ({
-    display: 'flex',
-    alignItems: 'center',
-    gap: 4,
-    padding: '8px 12px',
+  const toolBtn = (active?: boolean): React.CSSProperties => ({
+    display: 'flex', alignItems: 'center', gap: 4,
+    padding: '8px 14px',
     border: `1px solid ${active ? '#FECACA' : TOKENS.border}`,
     borderRadius: TOKENS.radiusSm,
     background: active ? '#FEF2F2' : TOKENS.card,
-    cursor: 'pointer',
-    fontSize: 13,
-    fontFamily: TOKENS.sans,
+    cursor: active && whisper.isTranscribing ? 'wait' : 'pointer',
+    fontSize: 13, fontFamily: TOKENS.sans,
     color: active ? '#991B1B' : TOKENS.subtext,
     minHeight: 40,
   });
 
-  // 녹음 버튼 라벨
-  const micLabel = whisper.isTranscribing
-    ? '전사 중...'
-    : isVoiceActive
-      ? '중지'
-      : '녹음';
+  const photoAddBtn: React.CSSProperties = {
+    background: 'none',
+    border: `1px dashed ${TOKENS.border}`,
+    borderRadius: TOKENS.radiusSm,
+    padding: '7px 18px',
+    fontSize: 12, fontFamily: TOKENS.sans,
+    color: TOKENS.muted, cursor: 'pointer',
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+  };
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      {/* Toolbar */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '8px 12px',
-          background: TOKENS.bg,
-          borderBottom: `1px solid ${TOKENS.borderLight}`,
-          flexShrink: 0,
-        }}
-      >
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          onChange={onFileSelect}
-          style={{ display: 'none' }}
-        />
-        <button onClick={() => fileRef.current?.click()} style={toolBtnStyle()}>
-          <PhotoIcon />
-          <span>사진</span>
+
+      {/* ── Toolbar ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: TOKENS.bg, borderBottom: `1px solid ${TOKENS.borderLight}`, flexShrink: 0 }}>
+        <input ref={fileRef} type="file" accept="image/*" onChange={onFileSelect} style={{ display: 'none' }} />
+        <button onClick={() => handleAddPhoto(activeBidRef.current)} style={toolBtn()}>
+          <PhotoIcon /><span>사진</span>
         </button>
         {state.sttMode !== 'off' && (
-          <button
-            onClick={toggleVoice}
-            disabled={whisper.isTranscribing}
-            style={toolBtnStyle(isVoiceActive)}
-          >
-            <MicIcon />
-            <span>{micLabel}</span>
+          <button onClick={toggleVoice} disabled={whisper.isTranscribing} style={toolBtn(isVoiceActive)}>
+            <MicIcon /><span>{micLabel}</span>
           </button>
         )}
         <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 11, color: TOKENS.muted, fontFamily: TOKENS.sans }}>
-          {(chapter.prose || '').length}자
-        </span>
+        <span style={{ fontSize: 11, color: TOKENS.muted, fontFamily: TOKENS.sans }}>{charCount}자</span>
         {!showGuide && (
-          <button
-            onClick={() => setShowGuide(true)}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: 12,
-              color: TOKENS.muted,
-              cursor: 'pointer',
-              fontFamily: TOKENS.sans,
-              padding: '6px 8px',
-              minHeight: 36,
-            }}
-          >
+          <button onClick={() => setShowGuide(true)} style={{ background: 'none', border: 'none', fontSize: 12, color: TOKENS.muted, cursor: 'pointer', fontFamily: TOKENS.sans, padding: '6px 8px', minHeight: 36 }}>
             도움말
           </button>
         )}
@@ -263,230 +295,128 @@ export default function NormalEditor({ chapter, chapterIdx }: NormalEditorProps)
 
       {/* Recording indicator */}
       {isVoiceActive && (
-        <div
-          style={{
-            padding: '10px 16px',
-            background: whisper.isTranscribing ? '#EFF6FF' : '#FEF2F2',
-            borderBottom: `1px solid ${whisper.isTranscribing ? '#BFDBFE' : '#FECACA'}`,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            fontFamily: TOKENS.sans,
-            flexShrink: 0,
-          }}
-        >
-          <span
-            style={{
-              width: 10,
-              height: 10,
-              borderRadius: '50%',
-              background: whisper.isTranscribing ? '#3B82F6' : '#DC2626',
-              animation: 'pulse 1s infinite',
-            }}
-          />
+        <div style={{ padding: '10px 16px', background: whisper.isTranscribing ? '#EFF6FF' : '#FEF2F2', borderBottom: `1px solid ${whisper.isTranscribing ? '#BFDBFE' : '#FECACA'}`, display: 'flex', alignItems: 'center', gap: 10, fontFamily: TOKENS.sans, flexShrink: 0 }}>
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: whisper.isTranscribing ? '#3B82F6' : '#DC2626', animation: 'pulse 1s infinite', flexShrink: 0 }} />
           <span style={{ fontSize: 13, color: whisper.isTranscribing ? '#1E40AF' : '#991B1B' }}>
-            {whisper.isTranscribing
-              ? '전사 중... 잠시만 기다려주세요.'
-              : whisper.isRecording
-                ? 'Whisper 녹음 중... (녹음 버튼을 누르면 중지)'
-                : '음성 인식 중...'}
+            {whisper.isTranscribing ? '전사 중...' : whisper.isRecording ? '녹음 중... (버튼을 누르면 중지)' : '음성 인식 중...'}
           </span>
           {isListening && transcript && (
-            <span
-              style={{
-                fontSize: 12,
-                color: TOKENS.subtext,
-                flex: 1,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              "{transcript}"
-            </span>
+            <span style={{ fontSize: 12, color: TOKENS.subtext, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>"{transcript}"</span>
           )}
         </div>
       )}
-
-      {/* Whisper error */}
       {whisper.error && (
-        <div
-          style={{
-            padding: '8px 16px',
-            background: '#FEF2F2',
-            borderBottom: '1px solid #FECACA',
-            fontSize: 12,
-            color: '#DC2626',
-            fontFamily: TOKENS.sans,
-          }}
-        >
+        <div style={{ padding: '8px 16px', background: '#FEF2F2', borderBottom: '1px solid #FECACA', fontSize: 12, color: '#DC2626', fontFamily: TOKENS.sans }}>
           {whisper.error}
         </div>
       )}
 
-      {/* Writing area */}
+      {/* ── 글쓰기 영역 ── */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '24px 16px' }}>
         <div style={{ maxWidth: 600, margin: '0 auto' }}>
-          {/* Chapter header */}
-          <div style={{ textAlign: 'center', marginBottom: 28 }}>
-            <p
-              style={{
-                fontSize: 11,
-                color: TOKENS.muted,
-                fontFamily: TOKENS.sans,
-                letterSpacing: 3,
-                marginBottom: 6,
-              }}
-            >
-              챕터
-            </p>
-            <h2 style={{ fontSize: 'clamp(1.2rem, 5vw, 1.4rem)', fontWeight: 400 }}>
-              {chapter.title}
-            </h2>
-            <div
-              style={{
-                width: 32,
-                height: 1,
-                background: TOKENS.accent,
-                margin: '12px auto 0',
-                opacity: 0.6,
-              }}
-            />
+
+          {/* 챕터 헤더 */}
+          <div style={{ textAlign: 'center', marginBottom: 24 }}>
+            <p style={{ fontSize: 11, color: TOKENS.muted, fontFamily: TOKENS.sans, letterSpacing: 3, marginBottom: 6 }}>챕터</p>
+            <h2 style={{ fontSize: 'clamp(1.2rem, 5vw, 1.4rem)', fontWeight: 400 }}>{chapter.title}</h2>
+            <div style={{ width: 32, height: 1, background: TOKENS.accent, margin: '12px auto 0', opacity: 0.6 }} />
           </div>
 
-          {/* Guide hint */}
+          {/* 도움말 힌트 */}
           {showGuide && (
-            <div
-              style={{
-                background: TOKENS.accentBg,
-                border: `1px solid ${TOKENS.accentBorder}`,
-                borderRadius: 10,
-                padding: '14px 16px',
-                marginBottom: 20,
-                position: 'relative',
-              }}
-            >
-              <button
-                onClick={() => setShowGuide(false)}
-                style={{
-                  position: 'absolute',
-                  top: 8,
-                  right: 10,
-                  background: 'none',
-                  border: 'none',
-                  fontSize: 16,
-                  color: TOKENS.muted,
-                  cursor: 'pointer',
-                  minWidth: 32,
-                  minHeight: 32,
-                }}
-              >
-                ×
-              </button>
-              <p
-                style={{
-                  fontSize: 14,
-                  color: TOKENS.accent,
-                  lineHeight: 1.8,
-                  fontFamily: TOKENS.sans,
-                  marginBottom: 8,
-                }}
-              >
-                이 주제에 대한 기억과 이야기를 자유롭게 적어주세요.
-              </p>
-              <p
-                style={{
-                  fontSize: 13,
-                  color: TOKENS.subtext,
-                  fontFamily: TOKENS.sans,
-                  fontStyle: 'italic',
-                }}
-              >
-                이렇게 시작해보세요: "{hint}"
-              </p>
+            <div style={{ background: TOKENS.accentBg, border: `1px solid ${TOKENS.accentBorder}`, borderRadius: 10, padding: '14px 16px', marginBottom: 20, position: 'relative' }}>
+              <button onClick={() => setShowGuide(false)} style={{ position: 'absolute', top: 8, right: 10, background: 'none', border: 'none', fontSize: 16, color: TOKENS.muted, cursor: 'pointer', minWidth: 32, minHeight: 32 }}>×</button>
+              <p style={{ fontSize: 14, color: TOKENS.accent, lineHeight: 1.8, fontFamily: TOKENS.sans, marginBottom: 8 }}>이 주제에 대한 기억과 이야기를 자유롭게 적어주세요.</p>
+              <p style={{ fontSize: 13, color: TOKENS.subtext, fontFamily: TOKENS.sans, fontStyle: 'italic' }}>이렇게 시작해보세요: "{hint}"</p>
             </div>
           )}
 
-          {/* Photos */}
-          {(chapter.photos || []).map((photo) => (
-            <div
-              key={photo.id}
-              style={{
-                background: TOKENS.card,
-                borderRadius: TOKENS.radiusSm,
-                overflow: 'hidden',
-                border: `1px solid ${TOKENS.borderLight}`,
-                marginBottom: 16,
-                boxShadow: TOKENS.shadowSm,
-              }}
-            >
-              <div style={{ position: 'relative' }}>
-                <img
-                  src={photo.data}
-                  alt=""
-                  style={{ width: '100%', display: 'block', maxHeight: 280, objectFit: 'cover' }}
-                />
-                <button
-                  onClick={() => removePhoto(chapterIdxRef.current, photo.id)}
-                  style={{
-                    position: 'absolute',
-                    top: 8,
-                    right: 8,
-                    width: 32,
-                    height: 32,
-                    borderRadius: '50%',
-                    background: 'rgba(0,0,0,.4)',
-                    color: '#fff',
-                    border: 'none',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 14,
-                  }}
-                >
-                  ×
-                </button>
-              </div>
-              <input
-                value={photo.caption || ''}
-                onChange={(e) => updatePhotoCaption(chapterIdxRef.current, photo.id, e.target.value)}
-                placeholder="사진 설명..."
-                style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  border: 'none',
-                  borderTop: `1px solid ${TOKENS.borderLight}`,
-                  fontSize: 14,
-                  fontFamily: TOKENS.sans,
-                  outline: 'none',
-                  color: TOKENS.subtext,
-                }}
-              />
-            </div>
-          ))}
+          {/* ── 블록 에디터 ── */}
+          {blocks.map((block, idx) => {
+            const isFirstBlock = idx === 0;
+            const isLastBlock = idx === blocks.length - 1;
 
-          {/* Main textarea */}
-          <textarea
-            ref={textareaRef}
-            value={chapter.prose ?? ''}
-            onChange={onChange}
-            placeholder={hint}
-            aria-label="이야기 작성"
-            style={{
-              width: '100%',
-              minHeight: 350,
-              border: 'none',
-              outline: 'none',
-              resize: 'none',
-              fontSize: fontPreset.prose,
-              lineHeight: fontPreset.lineHeight,
-              color: TOKENS.text,
-              fontFamily: TOKENS.serif,
-              background: 'transparent',
-              caretColor: TOKENS.accent,
-            }}
-          />
+            if (block.type === 'text') {
+              return (
+                <div key={block.bid}>
+                  {/* 텍스트 textarea */}
+                  <textarea
+                    ref={(el) => { taRefs.current[block.bid] = el; }}
+                    value={block.content}
+                    onChange={(e) => {
+                      updateTextBlock(block.bid, e.target.value);
+                      const ta = e.target;
+                      ta.style.height = 'auto';
+                      ta.style.height = Math.max(isFirstBlock ? 200 : 80, ta.scrollHeight) + 'px';
+                    }}
+                    onFocus={() => { activeBidRef.current = block.bid; }}
+                    placeholder={
+                      isFirstBlock && !block.content ? hint
+                        : !isFirstBlock && !block.content ? '계속 이야기를 이어가세요...'
+                        : ''
+                    }
+                    style={{
+                      width: '100%',
+                      minHeight: isFirstBlock ? 200 : 80,
+                      border: 'none', outline: 'none', resize: 'none',
+                      fontSize: fontPreset.prose,
+                      lineHeight: fontPreset.lineHeight,
+                      color: TOKENS.text, fontFamily: TOKENS.serif,
+                      background: 'transparent',
+                      caretColor: TOKENS.accent,
+                      display: 'block',
+                    }}
+                  />
+
+                  {/* 텍스트 블록 사이 — 사진 추가 버튼 */}
+                  {!isLastBlock && (
+                    <div style={{ textAlign: 'center', margin: '6px 0 14px' }}>
+                      <button onClick={() => handleAddPhoto(block.bid)} style={photoAddBtn}>
+                        <PhotoIcon /> 사진 추가
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            // ── 사진 블록 ──
+            const photo = (chapter.photos || []).find((p) => p.id === block.photoId);
+            if (!photo) return null;
+
+            return (
+              <div key={block.bid} style={{ background: TOKENS.card, borderRadius: TOKENS.radiusSm, overflow: 'hidden', border: `1px solid ${TOKENS.borderLight}`, marginBottom: 8, boxShadow: TOKENS.shadowSm }}>
+                <div style={{ position: 'relative' }}>
+                  <img src={photo.data} alt="" style={{ width: '100%', display: 'block', maxHeight: 320, objectFit: 'cover' }} />
+                  <button
+                    onClick={() => removePhotoBlock(block.bid, block.photoId)}
+                    style={{ position: 'absolute', top: 8, right: 8, width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,0,0,.45)', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}
+                  >×</button>
+                </div>
+                <input
+                  value={photo.caption || ''}
+                  onChange={(e) => updatePhotoCaption(chapterIdxRef.current, photo.id, e.target.value)}
+                  placeholder="사진 설명을 입력하세요..."
+                  style={{ width: '100%', padding: '11px 14px', border: 'none', borderTop: `1px solid ${TOKENS.borderLight}`, fontSize: 13, fontFamily: TOKENS.sans, outline: 'none', color: TOKENS.subtext, background: TOKENS.card, boxSizing: 'border-box' }}
+                />
+              </div>
+            );
+          })}
+
+          {/* 맨 아래 사진 추가 버튼 */}
+          <div style={{ textAlign: 'center', marginTop: 16 }}>
+            <button
+              onClick={() => {
+                const lastTB = [...blocks].reverse().find((b) => b.type === 'text') as TextBlock | undefined;
+                handleAddPhoto(lastTB?.bid ?? blocks[0].bid);
+              }}
+              style={photoAddBtn}
+            >
+              <PhotoIcon /> 사진 추가
+            </button>
+          </div>
+
+          <div style={{ height: 60 }} />
         </div>
       </div>
     </div>

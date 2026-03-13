@@ -11,7 +11,7 @@ import NormalEditor from '@/components/write/NormalEditor';
 export default function WritePage() {
   const router = useRouter();
   const { data: session } = useSession();
-  const { state, isSyncing, syncError, setChapterMode, setCurrentChapterIdx, markChapterDone, setFontSize, syncToDb } = useBook();
+  const { state, isSyncing, syncError, setChapterMode, setProse, setCurrentChapterIdx, markChapterDone, setFontSize, syncToDb } = useBook();
   const [showSidebar, setShowSidebar] = useState(false);
   const [showFinish, setShowFinish] = useState(false);
 
@@ -51,6 +51,19 @@ export default function WritePage() {
   }
 
   const mode = currentChapter.mode || 'chat';
+
+  // 모드 전환 핸들러 — 대화→일반 시 user 메시지를 prose로 자동 변환
+  const handleSetMode = (newMode: 'chat' | 'normal') => {
+    if (!currentChapter) return;
+    if (newMode === 'normal' && !currentChapter.prose) {
+      const userTexts = currentChapter.messages
+        .filter((m) => m.type === 'user')
+        .map((m) => m.text)
+        .join('\n\n');
+      if (userTexts) setProse(state.currentChapterIdx, userTexts);
+    }
+    setChapterMode(state.currentChapterIdx, newMode);
+  };
 
   const handleFinish = () => {
     markChapterDone(state.currentChapterIdx);
@@ -133,7 +146,7 @@ export default function WritePage() {
               return (
                 <button
                   key={m}
-                  onClick={() => setChapterMode(state.currentChapterIdx, m)}
+                  onClick={() => handleSetMode(m)}
                   style={{
                     flex: 1,
                     padding: '8px 0',
