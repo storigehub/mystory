@@ -1,13 +1,46 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useBook, Chapter } from '@/lib/book-context';
 import { TOKENS, FONT_SIZE_PRESETS } from '@/lib/design-tokens';
 
+/* ── 표지 템플릿 ── */
+const COVER_TEMPLATES = [
+  {
+    id: 'classic',
+    label: '클래식',
+    gradient: `linear-gradient(180deg, #3D3530, #2C2824)`,
+    textColor: '#FAFAF9',
+    accentOpacity: 0.25,
+  },
+  {
+    id: 'dawn',
+    label: '새벽',
+    gradient: `linear-gradient(180deg, #1a2a4a, #0d1b2e)`,
+    textColor: '#FAFAF9',
+    accentOpacity: 0.3,
+  },
+  {
+    id: 'sunset',
+    label: '황혼',
+    gradient: `linear-gradient(160deg, #704214, #9B6A2F)`,
+    textColor: '#FAFAF9',
+    accentOpacity: 0.3,
+  },
+  {
+    id: 'spring',
+    label: '봄날',
+    gradient: `linear-gradient(180deg, #F0EBE3, #E5DDD5)`,
+    textColor: '#3D3530',
+    accentOpacity: 0.2,
+  },
+] as const;
+
+type CoverTemplateId = typeof COVER_TEMPLATES[number]['id'];
+
 function getChapterText(chapter: Chapter): string {
   if (chapter.prose?.length > 0) return chapter.prose;
-  // Fallback: join user messages from chat mode
   return chapter.messages
     .filter((m) => m.type === 'user')
     .map((m) => m.text)
@@ -26,10 +59,12 @@ export default function BookPage() {
   const router = useRouter();
   const { state } = useBook();
   const chapterRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [coverTemplateId, setCoverTemplateId] = useState<CoverTemplateId>('classic');
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const fontPreset = FONT_SIZE_PRESETS[state.fontSize];
+  const coverTemplate = COVER_TEMPLATES.find((t) => t.id === coverTemplateId) || COVER_TEMPLATES[0];
 
-  // Only show chapters with content
   const writtenChapters = state.chapters.filter(
     (c) => getChapterText(c).length > 0 || getChapterPhotos(c).length > 0
   );
@@ -38,10 +73,37 @@ export default function BookPage() {
     chapterRefs.current[id]?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const handlePrint = () => {
+    setIsPrinting(true);
+    setTimeout(() => {
+      window.print();
+      setIsPrinting(false);
+    }, 100);
+  };
+
   return (
     <div style={{ minHeight: '100dvh', background: TOKENS.bg }}>
+      {/* Print styles */}
+      <style>{`
+        @media print {
+          body { background: white !important; }
+          .no-print { display: none !important; }
+          .book-cover {
+            page-break-after: always;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .book-toc { page-break-after: always; }
+          .book-chapter { page-break-before: auto; }
+          img { max-width: 100%; break-inside: avoid; }
+        }
+      `}</style>
+
       {/* Sticky header */}
       <div
+        className="no-print"
         style={{
           position: 'sticky',
           top: 0,
@@ -52,6 +114,7 @@ export default function BookPage() {
           borderBottom: `1px solid ${TOKENS.borderLight}`,
           display: 'flex',
           alignItems: 'center',
+          gap: 8,
           minHeight: 48,
         }}
       >
@@ -76,21 +139,48 @@ export default function BookPage() {
         <span style={{ flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 500 }}>
           {state.title}
         </span>
-        <span style={{ fontSize: 12, color: TOKENS.muted, fontFamily: TOKENS.sans, minWidth: 28, textAlign: 'right' }}>
+        <span style={{ fontSize: 12, color: TOKENS.muted, fontFamily: TOKENS.sans }}>
           {writtenChapters.length}장
         </span>
+        <button
+          onClick={handlePrint}
+          disabled={isPrinting}
+          style={{
+            background: TOKENS.dark,
+            color: '#FAFAF9',
+            border: 'none',
+            borderRadius: TOKENS.radiusSm,
+            fontSize: 12,
+            fontFamily: TOKENS.sans,
+            cursor: isPrinting ? 'wait' : 'pointer',
+            padding: '8px 14px',
+            minHeight: 40,
+          }}
+        >
+          {isPrinting ? '준비 중…' : '🖨 PDF'}
+        </button>
       </div>
 
       {/* Book cover */}
       <div
+        className="book-cover"
         style={{
           padding: 'clamp(48px, 12vw, 80px) 20px',
           textAlign: 'center',
-          background: `linear-gradient(180deg, ${TOKENS.dark}, #2C2824)`,
-          color: '#FAFAF9',
+          background: coverTemplate.gradient,
+          color: coverTemplate.textColor,
+          position: 'relative',
         }}
       >
-        <div style={{ width: 48, height: 1, background: '#FAFAF9', margin: '0 auto 28px', opacity: 0.25 }} />
+        <div
+          style={{
+            width: 48,
+            height: 1,
+            background: coverTemplate.textColor,
+            margin: '0 auto 28px',
+            opacity: coverTemplate.accentOpacity,
+          }}
+        />
         <h1
           style={{
             fontSize: 'clamp(1.6rem, 6vw, 2.2rem)',
@@ -115,10 +205,43 @@ export default function BookPage() {
         >
           나의이야기 · {new Date().getFullYear()}
         </p>
+
+        {/* Template selector */}
+        <div
+          className="no-print"
+          style={{
+            display: 'flex',
+            gap: 8,
+            justifyContent: 'center',
+            marginTop: 32,
+          }}
+        >
+          {COVER_TEMPLATES.map((tpl) => (
+            <button
+              key={tpl.id}
+              onClick={() => setCoverTemplateId(tpl.id)}
+              title={tpl.label}
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: '50%',
+                background: tpl.gradient,
+                border: coverTemplateId === tpl.id
+                  ? `2px solid ${coverTemplate.textColor}`
+                  : '2px solid transparent',
+                cursor: 'pointer',
+                outline: 'none',
+                boxShadow: coverTemplateId === tpl.id ? '0 0 0 2px rgba(0,0,0,0.3)' : 'none',
+                transition: 'transform 0.15s',
+                transform: coverTemplateId === tpl.id ? 'scale(1.2)' : 'scale(1)',
+              }}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Table of contents */}
-      <div style={{ maxWidth: 600, margin: '0 auto', padding: '36px 20px 20px' }}>
+      <div className="book-toc" style={{ maxWidth: 600, margin: '0 auto', padding: '36px 20px 20px' }}>
         <p
           style={{
             fontSize: 11,
@@ -172,6 +295,7 @@ export default function BookPage() {
             return (
               <div
                 key={ch.id}
+                className="book-chapter"
                 ref={(el) => { chapterRefs.current[ch.id] = el; }}
                 style={{ marginBottom: 56 }}
               >

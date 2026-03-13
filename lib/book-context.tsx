@@ -104,6 +104,7 @@ interface BookContextType {
   // DB
   syncToDb: () => Promise<void>;
   resetBook: () => void;
+  restoreFromDb: (bookId: string) => Promise<boolean>;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -300,6 +301,69 @@ export function BookProvider({ children }: { children: ReactNode }) {
     lastSyncedRef.current = '';
   }, []);
 
+  /* ── Supabase에서 복원 ── */
+  const restoreFromDb = useCallback(async (bookId: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/books/${bookId}`);
+      if (!res.ok) return false;
+
+      const { book, chapters: dbChapters } = await res.json();
+      if (!book) return false;
+
+      // Supabase 형식 → 로컬 Chapter 형식 변환
+      const chapters: Chapter[] = (dbChapters || [])
+        .sort((a: any, b: any) => a.sort_order - b.sort_order)
+        .map((dbCh: any) => ({
+          id: `ch-${Math.random().toString(36).slice(2, 10)}`,
+          dbId: dbCh.id,
+          tid: dbCh.topic_id || '',
+          title: dbCh.title || '',
+          custom: dbCh.is_custom || false,
+          mode: (dbCh.mode as 'chat' | 'normal') || 'chat',
+          messages: (dbCh.messages || [])
+            .sort((a: any, b: any) => a.sort_order - b.sort_order)
+            .map((m: any) => ({
+              id: Math.random().toString(36).slice(2, 10),
+              // DB는 'ai'로 저장, 로컬은 'assistant'
+              type: (m.type === 'ai' ? 'assistant' : m.type) as 'user' | 'assistant' | 'photo',
+              text: m.text || m.photo_url || '',
+              timestamp: Date.now(),
+            })),
+          prose: dbCh.prose || '',
+          photos: (dbCh.photos || [])
+            .sort((a: any, b: any) => a.sort_order - b.sort_order)
+            .map((p: any) => ({
+              id: Math.random().toString(36).slice(2, 10),
+              data: p.url || '',
+              caption: p.caption || '',
+            })),
+          done: dbCh.is_done || false,
+        }));
+
+      const selectedTopics = chapters.map((ch) => ({
+        id: ch.tid,
+        title: ch.title,
+        custom: ch.custom,
+      }));
+
+      setState((prev) => ({
+        ...prev,
+        bookId: book.id,
+        title: book.title || '나의 이야기',
+        author: book.author || '',
+        chapters,
+        selectedTopics,
+        currentChapterIdx: 0,
+      }));
+
+      lastSyncedRef.current = '';
+      return true;
+    } catch (err) {
+      console.warn('Supabase 복원 실패:', err);
+      return false;
+    }
+  }, []);
+
   /* ── Context Value ── */
   const value: BookContextType = {
     state,
@@ -421,6 +485,7 @@ export function BookProvider({ children }: { children: ReactNode }) {
 
     syncToDb,
     resetBook,
+    restoreFromDb,
   };
 
   return <BookContext.Provider value={value}>{children}</BookContext.Provider>;

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useBook, Chapter, Message } from '@/lib/book-context';
 import { TOKENS, FONT_SIZE_PRESETS } from '@/lib/design-tokens';
 import { getQuestions, REACTIONS, DEEP_FOLLOW, pick } from '@/lib/interview-questions';
+import { useWhisperSTT } from '@/lib/use-whisper-stt';
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -110,13 +111,15 @@ interface ChatEditorProps {
 }
 
 export default function ChatEditor({ chapter, chapterIdx }: ChatEditorProps) {
-  const { state, addMessage } = useBook();
+  const { state, addMessage, setProse, setChapterMode, markChapterDone } = useBook();
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [deepMode, setDeepMode] = useState(false);
-  const [isListening, setIsListening] = useState(false);
+  const [isListening, setIsListening] = useState(false); // browser STT
   const [transcript, setTranscript] = useState('');
   const [autoSendEnabled] = useState(state.autoSendAudio);
+  const [isAssembling, setIsAssembling] = useState(false);
+  const [assembleError, setAssembleError] = useState<string | null>(null);
 
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -130,7 +133,24 @@ export default function ChatEditor({ chapter, chapterIdx }: ChatEditorProps) {
 
   const fontPreset = FONT_SIZE_PRESETS[state.fontSize];
 
-  // Initialize Web Speech API
+  // ── Whisper STT ──
+  const onWhisperTranscribed = useCallback(
+    (text: string) => {
+      setInput(text);
+      if (autoSendEnabled) {
+        // input state가 반영된 뒤(다음 렌더)에 auto-send
+        setTimeout(() => sendFnRef.current?.(), 300);
+      }
+    },
+    [autoSendEnabled]
+  );
+
+  const whisper = useWhisperSTT(state.sttMode === 'whisper', onWhisperTranscribed);
+
+  // 복합 활성 상태 (UI용)
+  const isVoiceActive = isListening || whisper.isRecording || whisper.isTranscribing;
+
+  // ── Browser STT 초기화 ──
   useEffect(() => {
     if (state.sttMode !== 'browser') return;
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -160,7 +180,7 @@ export default function ChatEditor({ chapter, chapterIdx }: ChatEditorProps) {
     };
   }, [state.sttMode]);
 
-  // Sync transcript to input
+  // Browser STT: transcript → input 동기화
   useEffect(() => {
     if (isListening && transcript) {
       const before = inputBeforeSTT.current;
@@ -169,7 +189,7 @@ export default function ChatEditor({ chapter, chapterIdx }: ChatEditorProps) {
     }
   }, [transcript, isListening]);
 
-  // Track listening start
+  // Browser STT: 녹음 시작 시점 input 저장
   useEffect(() => {
     if (isListening && !prevListeningRef.current) {
       inputBeforeSTT.current = input;
@@ -177,14 +197,14 @@ export default function ChatEditor({ chapter, chapterIdx }: ChatEditorProps) {
     prevListeningRef.current = isListening;
   }, [isListening]);
 
-  // Auto-send on recording stop
+  // Browser STT: 녹음 종료 시 auto-send
   useEffect(() => {
     if (prevListeningRef.current && !isListening && autoSendEnabled) {
       setTimeout(() => sendFnRef.current?.(), 200);
     }
   }, [isListening, autoSendEnabled]);
 
-  // Initial AI greeting
+  // ── 최초 AI 인사말 ──
   useEffect(() => {
     if (chapter.messages.length === 0) {
       questionIndexRef.current = 0;
@@ -234,7 +254,6 @@ export default function ChatEditor({ chapter, chapterIdx }: ChatEditorProps) {
         return data.text || '이야기를 계속해주세요.';
       } catch (e) {
         console.warn('AI API failed, using fallback:', e);
-        // Fallback to local questions when API fails
         const questions = getQuestions(chapter.tid);
         if (isDeep) {
           return `${pick(REACTIONS)}\n\n${pick(DEEP_FOLLOW)}`;
@@ -246,6 +265,38 @@ export default function ChatEditor({ chapter, chapterIdx }: ChatEditorProps) {
     },
     [chapter]
   );
+
+  // ── 이야기 완성하기 (산문 변환) ──
+  const handleAssemble = useCallback(async () => {
+    if (isAssembling) return;
+    setIsAssembling(true);
+    setAssembleError(null);
+
+    try {
+      const res = await fetch('/api/ai/assemble', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: chapter.messages,
+          chapterTitle: chapter.title,
+          userName: state.author || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || '산문 변환 실패');
+      }
+
+      // 산문 저장 후 normal 모드로 전환
+      setProse(chapterIdx, data.prose);
+      setChapterMode(chapterIdx, 'normal');
+    } catch (err: any) {
+      setAssembleError(err.message || '이야기 완성에 실패했습니다.');
+    } finally {
+      setIsAssembling(false);
+    }
+  }, [isAssembling, chapter, state.author, chapterIdx, setProse, setChapterMode]);
 
   const send = useCallback(() => {
     if (isTypingRef.current) return;
@@ -263,7 +314,6 @@ export default function ChatEditor({ chapter, chapterIdx }: ChatEditorProps) {
     isTypingRef.current = true;
 
     const isDeep = deepMode;
-    const currentQIdx = questionIndexRef.current;
     if (!isDeep) questionIndexRef.current += 1;
     setDeepMode(false);
 
@@ -276,14 +326,19 @@ export default function ChatEditor({ chapter, chapterIdx }: ChatEditorProps) {
 
   sendFnRef.current = send;
 
+  // ── 마이크 버튼 ──
   const toggleVoice = () => {
-    if (!recognitionRef.current || state.sttMode !== 'browser') return;
-    if (isListening) {
-      try { recognitionRef.current.stop(); } catch {}
-      setIsListening(false);
-    } else {
-      setTranscript('');
-      try { recognitionRef.current.start(); setIsListening(true); } catch {}
+    if (state.sttMode === 'browser') {
+      if (!recognitionRef.current) return;
+      if (isListening) {
+        try { recognitionRef.current.stop(); } catch {}
+        setIsListening(false);
+      } else {
+        setTranscript('');
+        try { recognitionRef.current.start(); setIsListening(true); } catch {}
+      }
+    } else if (state.sttMode === 'whisper') {
+      whisper.toggleRecording();
     }
   };
 
@@ -326,6 +381,13 @@ export default function ChatEditor({ chapter, chapterIdx }: ChatEditorProps) {
   const questions = getQuestions(chapter.tid);
   const userMsgCount = chapter.messages.filter((m) => m.type === 'user').length;
   const answeredQ = Math.min(userMsgCount, questions.length);
+
+  // 녹음 상태 표시 텍스트
+  const voiceStatusText = whisper.isTranscribing
+    ? '전사 중...'
+    : whisper.isRecording
+      ? '녹음 중... (클릭하면 중지)'
+      : '음성 인식 중...';
 
   return (
     <>
@@ -448,7 +510,7 @@ export default function ChatEditor({ chapter, chapterIdx }: ChatEditorProps) {
         <div ref={endRef} />
       </div>
 
-      {/* "More" button */}
+      {/* "More" + "이야기 완성하기" buttons */}
       {!isTyping && userMsgCount > 0 && (
         <div
           style={{
@@ -459,6 +521,7 @@ export default function ChatEditor({ chapter, chapterIdx }: ChatEditorProps) {
             borderTop: `1px solid ${TOKENS.borderLight}`,
             background: TOKENS.bg,
             flexShrink: 0,
+            flexWrap: 'wrap',
           }}
         >
           <button
@@ -477,16 +540,64 @@ export default function ChatEditor({ chapter, chapterIdx }: ChatEditorProps) {
           >
             {deepMode ? '추가 이야기 입력 중...' : '이 질문에 더 이야기하기'}
           </button>
+
+          {/* 이야기 완성하기 버튼 (3개 이상 답변 시 활성화) */}
+          {userMsgCount >= 3 && (
+            <button
+              onClick={handleAssemble}
+              disabled={isAssembling}
+              style={{
+                padding: '8px 16px',
+                border: `1px solid ${TOKENS.dark}`,
+                borderRadius: 20,
+                background: isAssembling ? TOKENS.borderLight : TOKENS.dark,
+                color: isAssembling ? TOKENS.muted : '#FAFAF9',
+                fontSize: 13,
+                fontFamily: TOKENS.sans,
+                cursor: isAssembling ? 'wait' : 'pointer',
+                minHeight: 36,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              {isAssembling ? (
+                <>
+                  <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⏳</span>
+                  이야기 정리 중...
+                </>
+              ) : (
+                '✍️ 이야기 완성하기'
+              )}
+            </button>
+          )}
         </div>
       )}
 
-      {/* Listening indicator */}
-      {isListening && (
+      {/* Assemble error */}
+      {assembleError && (
+        <div
+          style={{
+            padding: '8px 16px',
+            background: '#FEF2F2',
+            borderTop: '1px solid #FECACA',
+            fontSize: 12,
+            color: '#DC2626',
+            fontFamily: TOKENS.sans,
+            flexShrink: 0,
+          }}
+        >
+          {assembleError}
+        </div>
+      )}
+
+      {/* Voice status indicator */}
+      {isVoiceActive && (
         <div
           style={{
             padding: '10px 16px',
-            background: '#FEF2F2',
-            borderTop: '1px solid #FECACA',
+            background: whisper.isTranscribing ? '#EFF6FF' : '#FEF2F2',
+            borderTop: `1px solid ${whisper.isTranscribing ? '#BFDBFE' : '#FECACA'}`,
             display: 'flex',
             alignItems: 'center',
             gap: 10,
@@ -499,12 +610,14 @@ export default function ChatEditor({ chapter, chapterIdx }: ChatEditorProps) {
               width: 10,
               height: 10,
               borderRadius: '50%',
-              background: '#DC2626',
+              background: whisper.isTranscribing ? '#3B82F6' : '#DC2626',
               animation: 'pulse 1s infinite',
             }}
           />
-          <span style={{ fontSize: 13, color: '#991B1B' }}>음성 인식 중...</span>
-          {transcript && (
+          <span style={{ fontSize: 13, color: whisper.isTranscribing ? '#1E40AF' : '#991B1B' }}>
+            {voiceStatusText}
+          </span>
+          {isListening && transcript && (
             <span
               style={{
                 fontSize: 12,
@@ -518,6 +631,23 @@ export default function ChatEditor({ chapter, chapterIdx }: ChatEditorProps) {
               "{transcript}"
             </span>
           )}
+        </div>
+      )}
+
+      {/* Whisper error */}
+      {whisper.error && (
+        <div
+          style={{
+            padding: '8px 16px',
+            background: '#FEF2F2',
+            borderTop: '1px solid #FECACA',
+            fontSize: 12,
+            color: '#DC2626',
+            fontFamily: TOKENS.sans,
+            flexShrink: 0,
+          }}
+        >
+          {whisper.error}
         </div>
       )}
 
@@ -568,17 +698,18 @@ export default function ChatEditor({ chapter, chapterIdx }: ChatEditorProps) {
           <button
             onClick={toggleVoice}
             aria-label="음성 녹음"
+            disabled={whisper.isTranscribing}
             style={{
               width: 44,
               height: 44,
-              border: `1px solid ${isListening ? '#FECACA' : TOKENS.border}`,
+              border: `1px solid ${isVoiceActive ? '#FECACA' : TOKENS.border}`,
               borderRadius: '50%',
-              background: isListening ? '#FEF2F2' : TOKENS.card,
-              cursor: 'pointer',
+              background: isVoiceActive ? '#FEF2F2' : TOKENS.card,
+              cursor: whisper.isTranscribing ? 'wait' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: isListening ? '#DC2626' : TOKENS.subtext,
+              color: isVoiceActive ? '#DC2626' : TOKENS.subtext,
               flexShrink: 0,
             }}
           >

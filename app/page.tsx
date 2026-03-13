@@ -7,15 +7,35 @@ import { TOKENS } from '@/lib/design-tokens';
 
 export default function LandingPage() {
   const router = useRouter();
-  const { state, setTitle, setAuthor } = useBook();
+  const { state, setTitle, setAuthor, restoreFromDb } = useBook();
   const [title, setTitleLocal] = useState(state.title);
   const [author, setAuthorLocal] = useState(state.author);
   const [hasSaved, setHasSaved] = useState(false);
+  const [dbBook, setDbBook] = useState<{ id: string; title: string; author: string } | null>(null);
+  const [isCheckingDb, setIsCheckingDb] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [dbDismissed, setDbDismissed] = useState(false);
 
   useEffect(() => {
-    // Check if user has previous work
+    // Check if user has previous work in localStorage
     setHasSaved(state.chapters.length > 0);
   }, [state.chapters.length]);
+
+  useEffect(() => {
+    // Check Supabase for saved book when no local data
+    const supabaseConfigured = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (!supabaseConfigured || state.chapters.length > 0 || dbDismissed) return;
+
+    setIsCheckingDb(true);
+    fetch('/api/books')
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.book) setDbBook(data.book);
+      })
+      .catch(() => {})
+      .finally(() => setIsCheckingDb(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleStart = () => {
     setTitle(title);
@@ -24,10 +44,24 @@ export default function LandingPage() {
   };
 
   const handleContinue = () => {
-    // Continue to writing page if they have saved work
     if (state.chapters.length > 0) {
       router.push('/write');
     }
+  };
+
+  const handleRestoreFromDb = async () => {
+    if (!dbBook) return;
+    setIsRestoring(true);
+    const ok = await restoreFromDb(dbBook.id);
+    setIsRestoring(false);
+    if (ok) {
+      router.push('/write');
+    }
+  };
+
+  const handleDismissDb = () => {
+    setDbBook(null);
+    setDbDismissed(true);
   };
 
   const inputStyle: React.CSSProperties = {
@@ -205,7 +239,73 @@ export default function LandingPage() {
           시작하기
         </button>
 
-        {/* Continue button (if has saved) */}
+        {/* Supabase restore banner */}
+        {!hasSaved && dbBook && !isCheckingDb && (
+          <div
+            style={{
+              marginTop: 12,
+              padding: '14px 16px',
+              background: TOKENS.card,
+              border: `1px solid ${TOKENS.accentBorder}`,
+              borderRadius: TOKENS.radiusSm,
+              textAlign: 'left',
+            }}
+          >
+            <p style={{ fontSize: 13, fontFamily: TOKENS.sans, color: TOKENS.subtext, marginBottom: 4 }}>
+              ☁️ 클라우드에 저장된 이전 작업이 있습니다
+            </p>
+            <p
+              style={{
+                fontSize: 14,
+                fontFamily: TOKENS.serif,
+                color: TOKENS.text,
+                marginBottom: 12,
+                fontWeight: 500,
+              }}
+            >
+              {dbBook.title}
+              {dbBook.author && <span style={{ color: TOKENS.muted, fontWeight: 400 }}> — {dbBook.author}</span>}
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={handleRestoreFromDb}
+                disabled={isRestoring}
+                style={{
+                  flex: 1,
+                  padding: '10px 0',
+                  background: TOKENS.dark,
+                  color: '#FAFAF9',
+                  border: 'none',
+                  borderRadius: TOKENS.radiusSm,
+                  fontSize: 13,
+                  fontFamily: TOKENS.sans,
+                  cursor: isRestoring ? 'wait' : 'pointer',
+                  fontWeight: 500,
+                }}
+              >
+                {isRestoring ? '불러오는 중…' : '불러오기'}
+              </button>
+              <button
+                onClick={handleDismissDb}
+                style={{
+                  flex: 1,
+                  padding: '10px 0',
+                  background: 'transparent',
+                  color: TOKENS.muted,
+                  border: `1px solid ${TOKENS.border}`,
+                  borderRadius: TOKENS.radiusSm,
+                  fontSize: 13,
+                  fontFamily: TOKENS.sans,
+                  cursor: 'pointer',
+                }}
+              >
+                새로 시작
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Continue button (if has local saved data) */}
         {hasSaved && (
           <button
             onClick={handleContinue}

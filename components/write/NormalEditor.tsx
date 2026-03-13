@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useBook, Chapter } from '@/lib/book-context';
 import { TOKENS, FONT_SIZE_PRESETS } from '@/lib/design-tokens';
 import { getHint } from '@/lib/interview-questions';
+import { useWhisperSTT } from '@/lib/use-whisper-stt';
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -39,7 +40,7 @@ interface NormalEditorProps {
 export default function NormalEditor({ chapter, chapterIdx }: NormalEditorProps) {
   const { state, setProse, addPhoto, removePhoto, updatePhotoCaption } = useBook();
   const [showGuide, setShowGuide] = useState(!chapter.prose?.length);
-  const [isListening, setIsListening] = useState(false);
+  const [isListening, setIsListening] = useState(false); // browser STT
   const [transcript, setTranscript] = useState('');
 
   const fileRef = useRef<HTMLInputElement>(null);
@@ -64,7 +65,33 @@ export default function NormalEditor({ chapter, chapterIdx }: NormalEditorProps)
     }
   }, [chapter.id]);
 
-  // Initialize Web Speech API
+  // ── Whisper STT ──
+  const onWhisperTranscribed = useCallback(
+    (text: string) => {
+      const current = chapter.prose || '';
+      const sep = current && !current.endsWith('\n') ? '\n\n' : '';
+      setProse(chapterIdxRef.current, current + sep + text);
+      if (showGuide) setShowGuide(false);
+      // 커서 이동
+      setTimeout(() => {
+        const ta = textareaRef.current;
+        if (ta) {
+          ta.focus();
+          ta.selectionStart = ta.selectionEnd = ta.value.length;
+          ta.style.height = 'auto';
+          ta.style.height = Math.max(350, ta.scrollHeight) + 'px';
+        }
+      }, 50);
+    },
+    [chapter.prose, setProse, showGuide]
+  );
+
+  const whisper = useWhisperSTT(state.sttMode === 'whisper', onWhisperTranscribed);
+
+  // 복합 활성 상태
+  const isVoiceActive = isListening || whisper.isRecording || whisper.isTranscribing;
+
+  // ── Browser STT 초기화 ──
   useEffect(() => {
     if (state.sttMode !== 'browser') return;
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -94,7 +121,7 @@ export default function NormalEditor({ chapter, chapterIdx }: NormalEditorProps)
     return () => { try { r.abort(); } catch {} };
   }, [state.sttMode]);
 
-  // Append transcript when recording stops
+  // Browser STT: 녹음 종료 시 텍스트 추가
   useEffect(() => {
     if (!isListening && transcript && transcript !== prevTranscriptRef.current) {
       const text = transcript.trim();
@@ -116,21 +143,24 @@ export default function NormalEditor({ chapter, chapterIdx }: NormalEditorProps)
   }, [isListening, transcript]);
 
   const toggleVoice = () => {
-    if (!recognitionRef.current || state.sttMode !== 'browser') return;
-    if (isListening) {
-      try { recognitionRef.current.stop(); } catch {}
-      setIsListening(false);
-    } else {
-      setTranscript('');
-      prevTranscriptRef.current = '';
-      try { recognitionRef.current.start(); setIsListening(true); } catch {}
+    if (state.sttMode === 'browser') {
+      if (!recognitionRef.current) return;
+      if (isListening) {
+        try { recognitionRef.current.stop(); } catch {}
+        setIsListening(false);
+      } else {
+        setTranscript('');
+        prevTranscriptRef.current = '';
+        try { recognitionRef.current.start(); setIsListening(true); } catch {}
+      }
+    } else if (state.sttMode === 'whisper') {
+      whisper.toggleRecording();
     }
   };
 
   const onChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setProse(chapterIdxRef.current, e.target.value);
     if (showGuide) setShowGuide(false);
-    // Auto-grow
     const ta = e.target;
     ta.style.height = 'auto';
     ta.style.height = Math.max(350, ta.scrollHeight) + 'px';
@@ -166,6 +196,13 @@ export default function NormalEditor({ chapter, chapterIdx }: NormalEditorProps)
     minHeight: 40,
   });
 
+  // 녹음 버튼 라벨
+  const micLabel = whisper.isTranscribing
+    ? '전사 중...'
+    : isVoiceActive
+      ? '중지'
+      : '녹음';
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Toolbar */}
@@ -192,9 +229,13 @@ export default function NormalEditor({ chapter, chapterIdx }: NormalEditorProps)
           <span>사진</span>
         </button>
         {state.sttMode !== 'off' && (
-          <button onClick={toggleVoice} style={toolBtnStyle(isListening)}>
+          <button
+            onClick={toggleVoice}
+            disabled={whisper.isTranscribing}
+            style={toolBtnStyle(isVoiceActive)}
+          >
             <MicIcon />
-            <span>{isListening ? '중지' : '녹음'}</span>
+            <span>{micLabel}</span>
           </button>
         )}
         <div style={{ flex: 1 }} />
@@ -221,12 +262,12 @@ export default function NormalEditor({ chapter, chapterIdx }: NormalEditorProps)
       </div>
 
       {/* Recording indicator */}
-      {isListening && (
+      {isVoiceActive && (
         <div
           style={{
             padding: '10px 16px',
-            background: '#FEF2F2',
-            borderBottom: '1px solid #FECACA',
+            background: whisper.isTranscribing ? '#EFF6FF' : '#FEF2F2',
+            borderBottom: `1px solid ${whisper.isTranscribing ? '#BFDBFE' : '#FECACA'}`,
             display: 'flex',
             alignItems: 'center',
             gap: 10,
@@ -239,12 +280,18 @@ export default function NormalEditor({ chapter, chapterIdx }: NormalEditorProps)
               width: 10,
               height: 10,
               borderRadius: '50%',
-              background: '#DC2626',
+              background: whisper.isTranscribing ? '#3B82F6' : '#DC2626',
               animation: 'pulse 1s infinite',
             }}
           />
-          <span style={{ fontSize: 13, color: '#991B1B' }}>음성 인식 중...</span>
-          {transcript && (
+          <span style={{ fontSize: 13, color: whisper.isTranscribing ? '#1E40AF' : '#991B1B' }}>
+            {whisper.isTranscribing
+              ? '전사 중... 잠시만 기다려주세요.'
+              : whisper.isRecording
+                ? 'Whisper 녹음 중... (녹음 버튼을 누르면 중지)'
+                : '음성 인식 중...'}
+          </span>
+          {isListening && transcript && (
             <span
               style={{
                 fontSize: 12,
@@ -258,6 +305,22 @@ export default function NormalEditor({ chapter, chapterIdx }: NormalEditorProps)
               "{transcript}"
             </span>
           )}
+        </div>
+      )}
+
+      {/* Whisper error */}
+      {whisper.error && (
+        <div
+          style={{
+            padding: '8px 16px',
+            background: '#FEF2F2',
+            borderBottom: '1px solid #FECACA',
+            fontSize: 12,
+            color: '#DC2626',
+            fontFamily: TOKENS.sans,
+          }}
+        >
+          {whisper.error}
         </div>
       )}
 

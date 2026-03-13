@@ -1,0 +1,12 @@
+{
+  "stt": {
+    "mode": "browser",
+    "whisperModel": "whisper-1",
+    "language": "ko",
+    "maxDurationSec": 120
+  },
+  "ui": {
+    "allowUserOverride": true,
+    "defaultFontScale": "normal"
+  }
+}
