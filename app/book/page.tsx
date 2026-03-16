@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useBook, Chapter } from '@/lib/book-context';
 import { TOKENS, FONT_SIZE_PRESETS } from '@/lib/design-tokens';
+import UserNav from '@/components/ui/UserNav';
 
 /* ── 표지 템플릿 ── */
 const COVER_TEMPLATES = [
@@ -83,6 +84,9 @@ export default function BookPage() {
 
   return (
     <div style={{ minHeight: '100dvh', background: TOKENS.bg }}>
+      {/* 공통 사용자 네비게이션 */}
+      <UserNav loginCallbackUrl="/book" />
+
       {/* Print styles */}
       <style>{`
         @media print {

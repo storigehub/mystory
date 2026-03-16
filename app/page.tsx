@@ -5,10 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useBook } from '@/lib/book-context';
 import { TOKENS } from '@/lib/design-tokens';
+import UserNav from '@/components/ui/UserNav';
 
 export default function LandingPage() {
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const { state, setTitle, setAuthor, restoreFromDb } = useBook();
   const [title, setTitleLocal] = useState(state.title);
   const [author, setAuthorLocal] = useState(state.author);
@@ -18,13 +19,13 @@ export default function LandingPage() {
   const [isRestoring, setIsRestoring] = useState(false);
   const [dbDismissed, setDbDismissed] = useState(false);
 
+  const isLoggedIn = status === 'authenticated';
+
   useEffect(() => {
-    // Check if user has previous work in localStorage
     setHasSaved(state.chapters.length > 0);
   }, [state.chapters.length]);
 
   useEffect(() => {
-    // Check Supabase for saved book when no local data
     const supabaseConfigured = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
     if (!supabaseConfigured || state.chapters.length > 0 || dbDismissed) return;
 
@@ -32,7 +33,6 @@ export default function LandingPage() {
     fetch('/api/books')
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
-        // 응답 형식: { books: BookSummary[] } — 첫 번째 책을 이어쓰기 대상으로 표시
         const firstBook = data?.books?.[0] ?? data?.book ?? null;
         if (firstBook) setDbBook(firstBook);
       })
@@ -58,9 +58,7 @@ export default function LandingPage() {
     setIsRestoring(true);
     const ok = await restoreFromDb(dbBook.id);
     setIsRestoring(false);
-    if (ok) {
-      router.push('/write');
-    }
+    if (ok) router.push('/write');
   };
 
   const handleDismissDb = () => {
@@ -92,33 +90,8 @@ export default function LandingPage() {
         position: 'relative',
       }}
     >
-      {/* 로그인 시 내 정보 버튼 */}
-      {session && (
-        <button
-          onClick={() => router.push('/my')}
-          style={{
-            position: 'fixed',
-            top: 16,
-            right: 16,
-            zIndex: 50,
-            background: 'rgba(255,255,255,0.95)',
-            border: `1px solid ${TOKENS.border}`,
-            borderRadius: 24,
-            padding: '8px 16px',
-            fontSize: 14,
-            fontFamily: TOKENS.sans,
-            color: TOKENS.text,
-            cursor: 'pointer',
-            boxShadow: TOKENS.shadow,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            minHeight: 44,
-          }}
-        >
-          👤 내 정보
-        </button>
-      )}
+      {/* 공통 사용자 네비게이션 (로그인/내 정보 버튼) */}
+      <UserNav loginCallbackUrl="/" />
 
       <div style={{ textAlign: 'center', maxWidth: 420, width: '100%' }}>
         {/* Decorative line */}
@@ -251,6 +224,84 @@ export default function LandingPage() {
           />
         </div>
 
+        {/* 로그인 안내 (비로그인 시) */}
+        {status !== 'loading' && !isLoggedIn && (
+          <div
+            style={{
+              marginTop: 12,
+              padding: '12px 16px',
+              background: '#f0f7ff',
+              border: `1px solid #c7dff7`,
+              borderRadius: TOKENS.radiusSm,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8,
+            }}
+          >
+            <span style={{ fontSize: 13, fontFamily: TOKENS.sans, color: '#2563eb' }}>
+              ☁️ 로그인하면 작성 내용이 클라우드에 저장됩니다
+            </span>
+            <button
+              onClick={() => router.push('/login?callbackUrl=%2F')}
+              style={{
+                background: '#2563eb',
+                color: '#fff',
+                border: 'none',
+                borderRadius: TOKENS.radiusSm,
+                padding: '8px 14px',
+                fontSize: 13,
+                fontFamily: TOKENS.sans,
+                fontWeight: 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                minHeight: 36,
+              }}
+            >
+              로그인
+            </button>
+          </div>
+        )}
+
+        {/* 로그인 시: 내 보관함 바로가기 안내 */}
+        {isLoggedIn && !hasSaved && !dbBook && (
+          <div
+            style={{
+              marginTop: 12,
+              padding: '12px 16px',
+              background: TOKENS.warm,
+              border: `1px solid ${TOKENS.borderLight}`,
+              borderRadius: TOKENS.radiusSm,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8,
+            }}
+          >
+            <span style={{ fontSize: 13, fontFamily: TOKENS.sans, color: TOKENS.subtext }}>
+              이전에 쓴 이야기를 확인할 수 있습니다
+            </span>
+            <button
+              onClick={() => router.push('/my')}
+              style={{
+                background: 'transparent',
+                color: TOKENS.accent,
+                border: `1px solid ${TOKENS.accentBorder}`,
+                borderRadius: TOKENS.radiusSm,
+                padding: '8px 14px',
+                fontSize: 13,
+                fontFamily: TOKENS.sans,
+                fontWeight: 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                minHeight: 36,
+              }}
+            >
+              내 책 보관함
+            </button>
+          </div>
+        )}
+
         {/* Start button */}
         <button
           onClick={handleStart}
@@ -265,7 +316,7 @@ export default function LandingPage() {
             fontFamily: TOKENS.sans,
             fontWeight: 500,
             cursor: 'pointer',
-            marginTop: 16,
+            marginTop: 12,
             minHeight: 52,
           }}
         >

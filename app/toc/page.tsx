@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useBook } from '@/lib/book-context';
 import { TOKENS } from '@/lib/design-tokens';
+import UserNav from '@/components/ui/UserNav';
 
 export default function TocPage() {
   const router = useRouter();
@@ -55,6 +56,8 @@ export default function TocPage() {
 
   return (
     <div style={{ minHeight: '100dvh', background: TOKENS.bg, padding: '0 16px' }}>
+      {/* 공통 사용자 네비게이션 */}
+      <UserNav loginCallbackUrl="/toc" />
       <div style={{ maxWidth: 480, margin: '0 auto', paddingTop: 28, paddingBottom: 110 }}>
         {/* Back button */}
         <button

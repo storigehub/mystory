@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useBook } from '@/lib/book-context';
 import { TOKENS } from '@/lib/design-tokens';
 import { TOPICS, getPresetCards } from '@/lib/topics-data';
+import UserNav from '@/components/ui/UserNav';
 
 export default function SelectPage() {
   const router = useRouter();
@@ -84,6 +85,9 @@ export default function SelectPage() {
 
   return (
     <div style={{ minHeight: '100dvh', background: TOKENS.bg }}>
+      {/* 공통 사용자 네비게이션 */}
+      <UserNav loginCallbackUrl="/select" />
+
       {/* Sticky header */}
       <div
         style={{
