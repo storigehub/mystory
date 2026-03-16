@@ -13,6 +13,7 @@ interface SyncPhoto {
   id: string;
   data: string; // base64
   caption?: string;
+  isFeatured?: boolean;
 }
 
 interface SyncChapter {
@@ -31,6 +32,7 @@ interface SyncChapter {
 interface SyncBody {
   title: string;
   author: string;
+  coverTemplateId?: string;
   chapters: SyncChapter[];
 }
 
@@ -67,10 +69,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: '접근 권한이 없습니다' }, { status: 403 });
     }
 
-    // 1. 책 메타데이터 업데이트
+    // 1. 책 메타데이터 업데이트 (표지 템플릿 포함)
     const { error: bookErr } = await supabase
       .from('books')
-      .update({ title: body.title, author: body.author })
+      .update({
+        title: body.title,
+        author: body.author,
+        cover_template: body.coverTemplateId ?? 'classic',
+      })
       .eq('id', bookId);
 
     if (bookErr) {
@@ -141,7 +147,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         await supabase.from('messages').insert(msgRows);
       }
 
-      // 5. 사진 동기화 (normal mode photos)
+      // 5. 사진 동기화 (is_featured 포함)
       if (ch.photos.length > 0) {
         await supabase.from('photos').delete().eq('chapter_id', dbChapterId);
 
@@ -150,6 +156,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           url: p.data, // base64 URL (MVP; 추후 S3)
           caption: p.caption || '',
           sort_order: idx,
+          is_featured: p.isFeatured ?? false,
         }));
 
         await supabase.from('photos').insert(photoRows);

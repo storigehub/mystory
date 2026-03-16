@@ -42,12 +42,15 @@ export interface Chapter {
   done: boolean;
 }
 
+export type CoverTemplateId = 'classic' | 'dawn' | 'sunset' | 'spring';
+
 export interface BookState {
   // 책 메타
   bookId: string | null; // Supabase books.id
   title: string;
   author: string;
   createdAt: string;
+  coverTemplateId: CoverTemplateId; // 표지 템플릿
 
   // 챕터
   selectedTopics: Array<{ id: string; title: string; custom: boolean }>;
@@ -65,6 +68,7 @@ export const DEFAULT_BOOK_STATE: BookState = {
   title: '나의 이야기',
   author: '',
   createdAt: new Date().toISOString(),
+  coverTemplateId: 'classic',
   selectedTopics: [],
   chapters: [],
   currentChapterIdx: 0,
@@ -103,6 +107,7 @@ interface BookContextType {
   setFontSize: (size: 'normal' | 'large') => void;
   setSTTMode: (mode: 'browser' | 'whisper' | 'off') => void;
   setAutoSendAudio: (enabled: boolean) => void;
+  setCoverTemplateId: (id: CoverTemplateId) => void;
 
   // DB
   syncToDb: () => Promise<void>;
@@ -233,6 +238,7 @@ export function BookProvider({ children }: { children: ReactNode }) {
     const serialized = JSON.stringify({
       title: state.title,
       author: state.author,
+      coverTemplateId: state.coverTemplateId,
       chapters: state.chapters,
     });
 
@@ -247,7 +253,7 @@ export function BookProvider({ children }: { children: ReactNode }) {
       if (syncTimer.current) clearTimeout(syncTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.title, state.author, state.chapters, isHydrated, userId]);
+  }, [state.title, state.author, state.coverTemplateId, state.chapters, isHydrated, userId]);
 
   /* ── 내부 동기화 함수 ── */
   const syncToDbInternal = useCallback(async (currentState: BookState) => {
@@ -262,6 +268,7 @@ export function BookProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({
           title: currentState.title,
           author: currentState.author,
+          coverTemplateId: currentState.coverTemplateId,
           chapters: currentState.chapters,
         }),
       });
@@ -290,6 +297,7 @@ export function BookProvider({ children }: { children: ReactNode }) {
       lastSyncedRef.current = JSON.stringify({
         title: currentState.title,
         author: currentState.author,
+        coverTemplateId: currentState.coverTemplateId,
         chapters: currentState.chapters,
       });
     } catch (err) {
@@ -390,6 +398,7 @@ export function BookProvider({ children }: { children: ReactNode }) {
               id: Math.random().toString(36).slice(2, 10),
               data: p.url || '',
               caption: p.caption || '',
+              isFeatured: p.is_featured ?? false,
             })),
           done: dbCh.is_done || false,
         }));
@@ -405,6 +414,7 @@ export function BookProvider({ children }: { children: ReactNode }) {
         bookId: book.id,
         title: book.title || '나의 이야기',
         author: book.author || '',
+        coverTemplateId: (book.cover_template as CoverTemplateId) || 'classic',
         chapters,
         selectedTopics,
         currentChapterIdx: 0,
@@ -554,6 +564,8 @@ export function BookProvider({ children }: { children: ReactNode }) {
     setSTTMode: (sttMode) => updateState((prev) => ({ ...prev, sttMode })),
     setAutoSendAudio: (autoSendAudio) =>
       updateState((prev) => ({ ...prev, autoSendAudio })),
+    setCoverTemplateId: (coverTemplateId) =>
+      updateState((prev) => ({ ...prev, coverTemplateId })),
 
     syncToDb,
     resetBook,

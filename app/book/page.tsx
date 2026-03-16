@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { useBook, Chapter, Photo } from '@/lib/book-context';
+import { useBook, Chapter, Photo, CoverTemplateId } from '@/lib/book-context';
 import { TOKENS, FONT_SIZE_PRESETS } from '@/lib/design-tokens';
 import PrintBook from '@/components/book/PrintBook';
 
@@ -31,7 +31,7 @@ const COVER_TEMPLATES = [
   { id: 'spring',  label: '봄날',   gradient: `linear-gradient(180deg, #F0EBE3, #E5DDD5)`, textColor: '#3D3530', accentOpacity: 0.2 },
 ] as const;
 
-type CoverTemplateId = typeof COVER_TEMPLATES[number]['id'];
+// CoverTemplateId는 book-context에서 import
 
 /* ── 판형 ── */
 const PAPER_SIZES = [
@@ -67,9 +67,8 @@ function cleanProse(prose: string): string {
 ───────────────────────────────────────────────────────────────── */
 export default function BookPage() {
   const router = useRouter();
-  const { state } = useBook();
+  const { state, setCoverTemplateId } = useBook();
 
-  const [coverTemplateId, setCoverTemplateId] = useState<CoverTemplateId>('classic');
   const [viewMode, setViewMode] = useState<'read' | 'flip'>('read');
 
   /* 출판 모달 */
@@ -83,7 +82,7 @@ export default function BookPage() {
 
   const chapterRefs = useRef<Record<string, HTMLElement | null>>({});
 
-  const coverTemplate = COVER_TEMPLATES.find((t) => t.id === coverTemplateId) ?? COVER_TEMPLATES[0];
+  const coverTemplate = COVER_TEMPLATES.find((t) => t.id === state.coverTemplateId) ?? COVER_TEMPLATES[0];
   const fontPreset = FONT_SIZE_PRESETS[state.fontSize];
   const writtenChapters = state.chapters.filter(
     (c) => getChapterText(c).length > 0 || getChapterPhotos(c).length > 0
@@ -91,7 +90,7 @@ export default function BookPage() {
 
   /* ── 표지 순환 ── */
   const handleCoverChange = () => {
-    const idx = COVER_TEMPLATES.findIndex((t) => t.id === coverTemplateId);
+    const idx = COVER_TEMPLATES.findIndex((t) => t.id === state.coverTemplateId);
     setCoverTemplateId(COVER_TEMPLATES[(idx + 1) % COVER_TEMPLATES.length].id);
   };
 
@@ -200,9 +199,9 @@ export default function BookPage() {
                 <button key={tpl.id} onClick={() => setCoverTemplateId(tpl.id)} title={tpl.label}
                   style={{
                     width: 18, height: 18, borderRadius: '50%', background: tpl.gradient,
-                    border: coverTemplateId === tpl.id ? '2px solid rgba(255,255,255,0.8)' : '2px solid transparent',
+                    border: state.coverTemplateId === tpl.id ? '2px solid rgba(255,255,255,0.8)' : '2px solid transparent',
                     cursor: 'pointer', outline: 'none',
-                    transform: coverTemplateId === tpl.id ? 'scale(1.3)' : 'scale(1)',
+                    transform: state.coverTemplateId === tpl.id ? 'scale(1.3)' : 'scale(1)',
                     transition: 'transform 0.15s',
                     boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
                   }}
@@ -389,10 +388,10 @@ export default function BookPage() {
               <button key={tpl.id} onClick={() => setCoverTemplateId(tpl.id)} title={tpl.label}
                 style={{
                   width: 22, height: 22, borderRadius: '50%', background: tpl.gradient,
-                  border: coverTemplateId === tpl.id ? '2px solid rgba(0,0,0,0.35)' : '2px solid transparent',
+                  border: state.coverTemplateId === tpl.id ? '2px solid rgba(0,0,0,0.35)' : '2px solid transparent',
                   cursor: 'pointer', outline: 'none',
-                  boxShadow: coverTemplateId === tpl.id ? '0 0 0 2px rgba(255,255,255,0.7)' : 'none',
-                  transform: coverTemplateId === tpl.id ? 'scale(1.25)' : 'scale(1)',
+                  boxShadow: state.coverTemplateId === tpl.id ? '0 0 0 2px rgba(255,255,255,0.7)' : 'none',
+                  transform: state.coverTemplateId === tpl.id ? 'scale(1.25)' : 'scale(1)',
                   transition: 'transform 0.15s',
                 }}
               />
