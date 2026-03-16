@@ -1,10 +1,36 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { useBook, Chapter } from '@/lib/book-context';
 import { TOKENS, FONT_SIZE_PRESETS } from '@/lib/design-tokens';
 import UserNav from '@/components/ui/UserNav';
+import PrintBook from '@/components/book/PrintBook';
+
+/* ── FlipBook: SSR 없이 동적 로드 (react-pageflip은 브라우저 전용) ── */
+const FlipBook = dynamic(() => import('@/components/book/FlipBook'), {
+  ssr: false,
+  loading: () => (
+    <div
+      style={{
+        width: 300,
+        height: 430,
+        background: TOKENS.card,
+        borderRadius: 8,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: TOKENS.muted,
+        fontFamily: TOKENS.sans,
+        fontSize: 13,
+        boxShadow: '0 4px 24px rgba(0,0,0,0.12)',
+      }}
+    >
+      책 준비 중…
+    </div>
+  ),
+});
 
 /* ── 표지 템플릿 ── */
 const COVER_TEMPLATES = [
@@ -40,6 +66,17 @@ const COVER_TEMPLATES = [
 
 type CoverTemplateId = typeof COVER_TEMPLATES[number]['id'];
 
+/* ── 판형 목록 ── */
+const PAPER_SIZES = [
+  { id: 'A5', label: 'A5', css: 'A5 portrait', desc: '148 × 210mm — 일반 단행본' },
+  { id: 'A4', label: 'A4', css: 'A4 portrait', desc: '210 × 297mm — 표준 문서' },
+  { id: 'B5', label: 'B5', css: '176mm 250mm portrait', desc: '176 × 250mm — 국판' },
+  { id: 'B6', label: 'B6', css: '125mm 176mm portrait', desc: '125 × 176mm — 소형 단행본' },
+] as const;
+
+type PaperSizeId = typeof PAPER_SIZES[number]['id'];
+
+/* ── 챕터 유틸 (FlipBook에서도 동일 함수 export) ── */
 function getChapterText(chapter: Chapter): string {
   if (chapter.prose?.length > 0) return chapter.prose;
   return chapter.messages
@@ -56,30 +93,93 @@ function getChapterPhotos(chapter: Chapter) {
   return [...chatPhotos, ...directPhotos];
 }
 
+/* ── 메인 컴포넌트 ── */
 export default function BookPage() {
   const router = useRouter();
   const { state } = useBook();
-  const chapterRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  /* 표지 */
   const [coverTemplateId, setCoverTemplateId] = useState<CoverTemplateId>('classic');
+
+  /* 출판 모달 */
+  const [showModal, setShowModal] = useState(false);
+  const [modalStep, setModalStep] = useState<1 | 2>(1);
+  const [adminPw, setAdminPw] = useState('');
+  const [adminError, setAdminError] = useState('');
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [selectedSize, setSelectedSize] = useState<PaperSizeId>('A5');
   const [isPrinting, setIsPrinting] = useState(false);
 
+  const coverTemplate = COVER_TEMPLATES.find((t) => t.id === coverTemplateId) ?? COVER_TEMPLATES[0];
   const fontPreset = FONT_SIZE_PRESETS[state.fontSize];
-  const coverTemplate = COVER_TEMPLATES.find((t) => t.id === coverTemplateId) || COVER_TEMPLATES[0];
+
+  /* 표지 순환 (FlipBook 내 🎨 버튼에서도 호출) */
+  const handleCoverChange = () => {
+    const currentIdx = COVER_TEMPLATES.findIndex((t) => t.id === coverTemplateId);
+    const nextIdx = (currentIdx + 1) % COVER_TEMPLATES.length;
+    setCoverTemplateId(COVER_TEMPLATES[nextIdx].id);
+  };
 
   const writtenChapters = state.chapters.filter(
     (c) => getChapterText(c).length > 0 || getChapterPhotos(c).length > 0
   );
 
-  const scrollToChapter = (id: string) => {
-    chapterRefs.current[id]?.scrollIntoView({ behavior: 'smooth' });
+  /* ── 관리자 비밀번호 확인 ── */
+  const handleVerify = async () => {
+    if (!adminPw) return;
+    setAdminLoading(true);
+    setAdminError('');
+    try {
+      const res = await fetch('/api/admin/settings', {
+        headers: { 'x-admin-password': adminPw },
+      });
+      if (res.ok) {
+        setModalStep(2);
+      } else {
+        setAdminError('비밀번호가 올바르지 않습니다.');
+      }
+    } catch {
+      setAdminError('서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setAdminLoading(false);
+    }
   };
 
+  /* ── PDF 출력 ── */
   const handlePrint = () => {
+    const sizeObj = PAPER_SIZES.find((s) => s.id === selectedSize) ?? PAPER_SIZES[0];
     setIsPrinting(true);
+
+    // @page size 동적 주입
+    const styleEl = document.createElement('style');
+    styleEl.id = 'print-size-override';
+    styleEl.textContent = `@media print { @page { size: ${sizeObj.css}; } }`;
+    document.head.appendChild(styleEl);
+
     setTimeout(() => {
       window.print();
+      // 출력 후 제거
+      const existing = document.getElementById('print-size-override');
+      if (existing) document.head.removeChild(existing);
       setIsPrinting(false);
-    }, 100);
+      closeModal();
+    }, 200);
+  };
+
+  /* ── 모달 닫기 ── */
+  const closeModal = () => {
+    setShowModal(false);
+    setModalStep(1);
+    setAdminPw('');
+    setAdminError('');
+  };
+
+  /* ── 모달 열기 ── */
+  const openModal = () => {
+    setModalStep(1);
+    setAdminPw('');
+    setAdminError('');
+    setShowModal(true);
   };
 
   return (
@@ -87,25 +187,7 @@ export default function BookPage() {
       {/* 공통 사용자 네비게이션 */}
       <UserNav loginCallbackUrl="/book" />
 
-      {/* Print styles */}
-      <style>{`
-        @media print {
-          body { background: white !important; }
-          .no-print { display: none !important; }
-          .book-cover {
-            page-break-after: always;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-          .book-toc { page-break-after: always; }
-          .book-chapter { page-break-before: auto; }
-          img { max-width: 100%; break-inside: avoid; }
-        }
-      `}</style>
-
-      {/* Sticky header */}
+      {/* ── Sticky 헤더 ── */}
       <div
         className="no-print"
         style={{
@@ -140,15 +222,17 @@ export default function BookPage() {
         >
           ← 편집으로
         </button>
-        <span style={{ flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 500 }}>
-          {state.title}
+
+        <span style={{ flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 500, color: TOKENS.text }}>
+          {state.title || '나의 이야기'}
         </span>
+
         <span style={{ fontSize: 12, color: TOKENS.muted, fontFamily: TOKENS.sans }}>
           {writtenChapters.length}장
         </span>
+
         <button
-          onClick={handlePrint}
-          disabled={isPrinting}
+          onClick={openModal}
           style={{
             background: TOKENS.dark,
             color: '#FAFAF9',
@@ -156,226 +240,367 @@ export default function BookPage() {
             borderRadius: TOKENS.radiusSm,
             fontSize: 12,
             fontFamily: TOKENS.sans,
-            cursor: isPrinting ? 'wait' : 'pointer',
+            fontWeight: 500,
+            cursor: 'pointer',
             padding: '8px 14px',
             minHeight: 40,
+            whiteSpace: 'nowrap',
           }}
         >
-          {isPrinting ? '준비 중…' : '🖨 PDF'}
+          📖 책 출판하기
         </button>
       </div>
 
-      {/* Book cover */}
+      {/* ── 표지 템플릿 선택 ── */}
       <div
-        className="book-cover"
+        className="no-print"
         style={{
-          padding: 'clamp(48px, 12vw, 80px) 20px',
-          textAlign: 'center',
-          background: coverTemplate.gradient,
-          color: coverTemplate.textColor,
-          position: 'relative',
+          display: 'flex',
+          gap: 10,
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: '14px 0 8px',
         }}
       >
-        <div
-          style={{
-            width: 48,
-            height: 1,
-            background: coverTemplate.textColor,
-            margin: '0 auto 28px',
-            opacity: coverTemplate.accentOpacity,
-          }}
-        />
-        <h1
-          style={{
-            fontSize: 'clamp(1.6rem, 6vw, 2.2rem)',
-            fontWeight: 300,
-            letterSpacing: '-0.02em',
-            marginBottom: 10,
-          }}
-        >
-          {state.title || '나의 이야기'}
-        </h1>
-        <p style={{ fontSize: 15, opacity: 0.6, fontWeight: 300 }}>
-          {state.author || '저자'}
-        </p>
-        <p
-          style={{
-            fontSize: 11,
-            opacity: 0.3,
-            marginTop: 20,
-            fontFamily: TOKENS.sans,
-            letterSpacing: 3,
-          }}
-        >
-          나의이야기 · {new Date().getFullYear()}
-        </p>
-
-        {/* Template selector */}
-        <div
-          className="no-print"
-          style={{
-            display: 'flex',
-            gap: 8,
-            justifyContent: 'center',
-            marginTop: 32,
-          }}
-        >
-          {COVER_TEMPLATES.map((tpl) => (
-            <button
-              key={tpl.id}
-              onClick={() => setCoverTemplateId(tpl.id)}
-              title={tpl.label}
-              style={{
-                width: 24,
-                height: 24,
-                borderRadius: '50%',
-                background: tpl.gradient,
-                border: coverTemplateId === tpl.id
-                  ? `2px solid ${coverTemplate.textColor}`
-                  : '2px solid transparent',
-                cursor: 'pointer',
-                outline: 'none',
-                boxShadow: coverTemplateId === tpl.id ? '0 0 0 2px rgba(0,0,0,0.3)' : 'none',
-                transition: 'transform 0.15s',
-                transform: coverTemplateId === tpl.id ? 'scale(1.2)' : 'scale(1)',
-              }}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Table of contents */}
-      <div className="book-toc" style={{ maxWidth: 600, margin: '0 auto', padding: '36px 20px 20px' }}>
-        <p
+        <span
           style={{
             fontSize: 11,
             color: TOKENS.muted,
-            letterSpacing: 4,
-            textAlign: 'center',
             fontFamily: TOKENS.sans,
-            marginBottom: 24,
+            letterSpacing: 2,
           }}
         >
-          목차
-        </p>
-        {state.chapters.map((ch, i) => (
+          표지
+        </span>
+        {COVER_TEMPLATES.map((tpl) => (
           <button
-            key={ch.id}
-            onClick={() => scrollToChapter(ch.id)}
+            key={tpl.id}
+            onClick={() => setCoverTemplateId(tpl.id)}
+            title={tpl.label}
+            aria-label={`표지 ${tpl.label}`}
             style={{
-              display: 'flex',
-              alignItems: 'baseline',
-              gap: 10,
-              padding: '10px 0',
-              width: '100%',
-              background: 'none',
-              border: 'none',
-              borderBottom: `1px solid ${TOKENS.borderLight}`,
+              width: 22,
+              height: 22,
+              borderRadius: '50%',
+              background: tpl.gradient,
+              border:
+                coverTemplateId === tpl.id
+                  ? '2px solid rgba(0,0,0,0.35)'
+                  : '2px solid transparent',
               cursor: 'pointer',
-              textAlign: 'left',
+              outline: 'none',
+              boxShadow:
+                coverTemplateId === tpl.id
+                  ? '0 0 0 2px rgba(255,255,255,0.7)'
+                  : 'none',
+              transform: coverTemplateId === tpl.id ? 'scale(1.25)' : 'scale(1)',
+              transition: 'transform 0.15s',
+            }}
+          />
+        ))}
+      </div>
+
+      {/* ── FlipBook 뷰어 ── */}
+      <div
+        className="flip-wrapper"
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          padding: '16px 0 56px',
+        }}
+      >
+        <FlipBook
+          title={state.title}
+          author={state.author}
+          chapters={state.chapters}
+          coverTemplate={coverTemplate}
+          fontPreset={fontPreset}
+          onCoverChange={handleCoverChange}
+        />
+      </div>
+
+      {/* ── PrintBook: 화면에선 숨김 / 인쇄 시 표시 ── */}
+      <PrintBook
+        title={state.title}
+        author={state.author}
+        chapters={state.chapters}
+        coverGradient={coverTemplate.gradient}
+        coverTextColor={coverTemplate.textColor}
+      />
+
+      {/* ── 관리자 출판 모달 ── */}
+      {showModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.55)',
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeModal();
+          }}
+        >
+          <div
+            style={{
+              background: TOKENS.card,
+              borderRadius: 14,
+              padding: '28px 24px',
+              width: '100%',
+              maxWidth: 360,
+              boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
             }}
           >
-            <span style={{ fontSize: 12, color: TOKENS.muted, fontFamily: TOKENS.sans, minWidth: 26 }}>
-              {String(i + 1).padStart(2, '0')}
-            </span>
-            <span style={{ flex: 1, fontSize: 15, color: TOKENS.text, fontFamily: TOKENS.serif }}>
-              {ch.title}
-            </span>
-          </button>
-        ))}
-        <div style={{ width: 32, height: 1, background: TOKENS.border, margin: '32px auto' }} />
-      </div>
+            {/* ─ Step 1: 비밀번호 입력 ─ */}
+            {modalStep === 1 && (
+              <>
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: TOKENS.muted,
+                    fontFamily: TOKENS.sans,
+                    letterSpacing: 3,
+                    marginBottom: 8,
+                  }}
+                >
+                  책 출판하기
+                </p>
+                <h3
+                  style={{
+                    fontSize: 17,
+                    fontWeight: 500,
+                    marginBottom: 4,
+                    color: TOKENS.text,
+                  }}
+                >
+                  관리자 인증
+                </h3>
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: TOKENS.muted,
+                    marginBottom: 20,
+                    fontFamily: TOKENS.sans,
+                    lineHeight: 1.6,
+                  }}
+                >
+                  PDF 파일 저장은 관리자만 사용할 수 있습니다.
+                  <br />
+                  관리자 비밀번호를 입력해 주세요.
+                </p>
 
-      {/* Chapters content */}
-      <div style={{ maxWidth: 600, margin: '0 auto', padding: '0 20px 80px' }}>
-        {writtenChapters.length === 0 ? (
-          <p style={{ textAlign: 'center', color: TOKENS.muted, marginTop: 60, fontFamily: TOKENS.sans }}>
-            아직 작성된 이야기가 없습니다
-          </p>
-        ) : (
-          writtenChapters.map((ch, i) => {
-            const text = getChapterText(ch);
-            const photos = getChapterPhotos(ch);
-            return (
-              <div
-                key={ch.id}
-                className="book-chapter"
-                ref={(el) => { chapterRefs.current[ch.id] = el; }}
-                style={{ marginBottom: 56 }}
-              >
-                {/* Chapter header */}
-                <div style={{ textAlign: 'center', marginBottom: 32 }}>
-                  <p style={{ fontSize: 11, color: TOKENS.muted, fontFamily: TOKENS.sans, letterSpacing: 3 }}>
-                    제 {String(i + 1).padStart(2, '0')} 장
-                  </p>
-                  <h2 style={{ fontSize: 'clamp(1.2rem, 5vw, 1.5rem)', fontWeight: 400, marginTop: 8 }}>
-                    {ch.title}
-                  </h2>
-                  <div
+                <input
+                  type="password"
+                  value={adminPw}
+                  onChange={(e) => {
+                    setAdminPw(e.target.value);
+                    if (adminError) setAdminError('');
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleVerify();
+                  }}
+                  placeholder="관리자 비밀번호"
+                  autoFocus
+                  style={{
+                    width: '100%',
+                    padding: '13px 14px',
+                    border: `1px solid ${adminError ? '#e53e3e' : TOKENS.border}`,
+                    borderRadius: TOKENS.radiusSm,
+                    fontSize: 15,
+                    fontFamily: TOKENS.sans,
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                    background: TOKENS.bg,
+                    color: TOKENS.text,
+                  }}
+                />
+                {adminError && (
+                  <p
                     style={{
-                      width: 32,
-                      height: 1,
-                      background: TOKENS.accent,
-                      margin: '14px auto 0',
-                      opacity: 0.5,
-                    }}
-                  />
-                </div>
-
-                {/* Photos */}
-                {photos.map((photo, j) => (
-                  <div key={j} style={{ margin: '24px 0', textAlign: 'center' }}>
-                    <img
-                      src={photo.data}
-                      alt=""
-                      style={{ maxWidth: '100%', borderRadius: TOKENS.radiusSm, boxShadow: TOKENS.shadowLg }}
-                    />
-                    {photo.caption && (
-                      <p style={{ fontSize: 12, color: TOKENS.muted, marginTop: 8, fontFamily: TOKENS.sans }}>
-                        {photo.caption}
-                      </p>
-                    )}
-                  </div>
-                ))}
-
-                {/* Text content */}
-                {text
-                  .split('\n\n')
-                  .filter(Boolean)
-                  .map((paragraph, j) => (
-                    <p
-                      key={j}
-                      style={{
-                        fontSize: fontPreset.book,
-                        lineHeight: fontPreset.lineHeight,
-                        color: TOKENS.text,
-                        marginBottom: 14,
-                        fontWeight: 300,
-                      }}
-                    >
-                      {paragraph}
-                    </p>
-                  ))}
-
-                {/* Chapter separator */}
-                {i < writtenChapters.length - 1 && (
-                  <div
-                    style={{
-                      textAlign: 'center',
-                      padding: '28px 0',
-                      color: TOKENS.light,
-                      letterSpacing: 12,
                       fontSize: 12,
+                      color: '#e53e3e',
+                      marginTop: 6,
+                      fontFamily: TOKENS.sans,
                     }}
                   >
-                    · · ·
-                  </div>
+                    {adminError}
+                  </p>
                 )}
-              </div>
-            );
-          })
-        )}
-      </div>
+
+                <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                  <button
+                    onClick={closeModal}
+                    style={{
+                      flex: 1,
+                      padding: '12px 0',
+                      background: 'transparent',
+                      border: `1px solid ${TOKENS.border}`,
+                      borderRadius: TOKENS.radiusSm,
+                      fontSize: 14,
+                      fontFamily: TOKENS.sans,
+                      cursor: 'pointer',
+                      color: TOKENS.muted,
+                      minHeight: 48,
+                    }}
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={handleVerify}
+                    disabled={adminLoading || !adminPw}
+                    style={{
+                      flex: 2,
+                      padding: '12px 0',
+                      background: adminLoading || !adminPw ? TOKENS.muted : TOKENS.dark,
+                      color: '#FAFAF9',
+                      border: 'none',
+                      borderRadius: TOKENS.radiusSm,
+                      fontSize: 14,
+                      fontFamily: TOKENS.sans,
+                      fontWeight: 500,
+                      cursor: adminLoading || !adminPw ? 'not-allowed' : 'pointer',
+                      minHeight: 48,
+                      opacity: adminLoading || !adminPw ? 0.65 : 1,
+                    }}
+                  >
+                    {adminLoading ? '확인 중…' : '확인'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* ─ Step 2: 판형 선택 ─ */}
+            {modalStep === 2 && (
+              <>
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: TOKENS.muted,
+                    fontFamily: TOKENS.sans,
+                    letterSpacing: 3,
+                    marginBottom: 8,
+                  }}
+                >
+                  책 출판하기
+                </p>
+                <h3
+                  style={{
+                    fontSize: 17,
+                    fontWeight: 500,
+                    marginBottom: 4,
+                    color: TOKENS.text,
+                  }}
+                >
+                  판형 선택
+                </h3>
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: TOKENS.muted,
+                    marginBottom: 20,
+                    fontFamily: TOKENS.sans,
+                  }}
+                >
+                  PDF로 저장할 종이 크기를 선택하세요.
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+                  {PAPER_SIZES.map((size) => (
+                    <label
+                      key={size.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        padding: '13px 14px',
+                        border: `1.5px solid ${
+                          selectedSize === size.id ? TOKENS.accent : TOKENS.border
+                        }`,
+                        borderRadius: TOKENS.radiusSm,
+                        cursor: 'pointer',
+                        background: selectedSize === size.id ? TOKENS.warm : TOKENS.card,
+                        transition: 'border-color 0.15s, background 0.15s',
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="paperSize"
+                        value={size.id}
+                        checked={selectedSize === size.id}
+                        onChange={() => setSelectedSize(size.id)}
+                        style={{ accentColor: TOKENS.accent, width: 16, height: 16 }}
+                      />
+                      <span
+                        style={{
+                          fontSize: 15,
+                          fontFamily: TOKENS.sans,
+                          fontWeight: selectedSize === size.id ? 500 : 400,
+                          color: TOKENS.text,
+                        }}
+                      >
+                        {size.label}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: TOKENS.muted,
+                          fontFamily: TOKENS.sans,
+                          marginLeft: 'auto',
+                        }}
+                      >
+                        {size.desc}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={closeModal}
+                    style={{
+                      flex: 1,
+                      padding: '12px 0',
+                      background: 'transparent',
+                      border: `1px solid ${TOKENS.border}`,
+                      borderRadius: TOKENS.radiusSm,
+                      fontSize: 14,
+                      fontFamily: TOKENS.sans,
+                      cursor: 'pointer',
+                      color: TOKENS.muted,
+                      minHeight: 48,
+                    }}
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={handlePrint}
+                    disabled={isPrinting}
+                    style={{
+                      flex: 2,
+                      padding: '12px 0',
+                      background: isPrinting ? TOKENS.muted : TOKENS.dark,
+                      color: '#FAFAF9',
+                      border: 'none',
+                      borderRadius: TOKENS.radiusSm,
+                      fontSize: 14,
+                      fontFamily: TOKENS.sans,
+                      fontWeight: 500,
+                      cursor: isPrinting ? 'wait' : 'pointer',
+                      minHeight: 48,
+                    }}
+                  >
+                    {isPrinting ? '준비 중…' : '📥 PDF로 저장'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
