@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useBook, Chapter } from '@/lib/book-context';
 import { TOKENS, FONT_SIZE_PRESETS } from '@/lib/design-tokens';
-import UserNav from '@/components/ui/UserNav';
 import PrintBook from '@/components/book/PrintBook';
 
 /* ── FlipBook: SSR 없이 동적 로드 (react-pageflip은 브라우저 전용) ── */
@@ -184,9 +183,6 @@ export default function BookPage() {
 
   return (
     <div style={{ minHeight: '100dvh', background: TOKENS.bg }}>
-      {/* 공통 사용자 네비게이션 */}
-      <UserNav loginCallbackUrl="/book" />
-
       {/* ── Sticky 헤더 ── */}
       <div
         className="no-print"
