@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase';
+import { requireAuth } from '@/lib/auth-helpers';
 
 interface SyncMessage {
   id: string;
@@ -45,9 +46,26 @@ interface SyncBody {
  */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
+    const { userId, error: authError } = await requireAuth();
+    if (authError) return authError;
+
     const body: SyncBody = await req.json();
     const supabase = createServerClient();
     const bookId = params.id;
+
+    // 소유자 검증
+    const { data: bookCheck, error: checkErr } = await supabase
+      .from('books')
+      .select('user_id')
+      .eq('id', bookId)
+      .single();
+
+    if (checkErr) {
+      return NextResponse.json({ error: '책을 찾을 수 없습니다' }, { status: 404 });
+    }
+    if (bookCheck.user_id && bookCheck.user_id !== userId) {
+      return NextResponse.json({ error: '접근 권한이 없습니다' }, { status: 403 });
+    }
 
     // 1. 책 메타데이터 업데이트
     const { error: bookErr } = await supabase

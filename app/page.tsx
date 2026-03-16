@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { useBook } from '@/lib/book-context';
 import { TOKENS } from '@/lib/design-tokens';
 
 export default function LandingPage() {
   const router = useRouter();
+  const { data: session } = useSession();
   const { state, setTitle, setAuthor, restoreFromDb } = useBook();
   const [title, setTitleLocal] = useState(state.title);
   const [author, setAuthorLocal] = useState(state.author);
@@ -30,7 +32,9 @@ export default function LandingPage() {
     fetch('/api/books')
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
-        if (data?.book) setDbBook(data.book);
+        // 응답 형식: { books: BookSummary[] } — 첫 번째 책을 이어쓰기 대상으로 표시
+        const firstBook = data?.books?.[0] ?? data?.book ?? null;
+        if (firstBook) setDbBook(firstBook);
       })
       .catch(() => {})
       .finally(() => setIsCheckingDb(false));
@@ -85,8 +89,37 @@ export default function LandingPage() {
         justifyContent: 'center',
         padding: '2rem 1.25rem',
         background: `linear-gradient(180deg, ${TOKENS.bg}, ${TOKENS.warm})`,
+        position: 'relative',
       }}
     >
+      {/* 로그인 시 내 정보 버튼 */}
+      {session && (
+        <button
+          onClick={() => router.push('/my')}
+          style={{
+            position: 'fixed',
+            top: 16,
+            right: 16,
+            zIndex: 50,
+            background: 'rgba(255,255,255,0.95)',
+            border: `1px solid ${TOKENS.border}`,
+            borderRadius: 24,
+            padding: '8px 16px',
+            fontSize: 14,
+            fontFamily: TOKENS.sans,
+            color: TOKENS.text,
+            cursor: 'pointer',
+            boxShadow: TOKENS.shadow,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            minHeight: 44,
+          }}
+        >
+          👤 내 정보
+        </button>
+      )}
+
       <div style={{ textAlign: 'center', maxWidth: 420, width: '100%' }}>
         {/* Decorative line */}
         <div

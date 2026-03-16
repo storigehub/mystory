@@ -7,6 +7,7 @@ export interface Database {
           id: string;
           title: string;
           author: string;
+          user_id: string | null;
           created_at: string;
           updated_at: string;
           settings: Record<string, unknown>;
@@ -55,6 +56,16 @@ export interface Database {
         };
         Insert: Omit<Database["public"]["Tables"]["photos"]["Row"], "id" | "created_at">;
         Update: Partial<Database["public"]["Tables"]["photos"]["Insert"]>;
+      };
+      profiles: {
+        Row: {
+          user_id: string;
+          nickname: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["profiles"]["Row"], "created_at" | "updated_at">;
+        Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
       };
     };
   };

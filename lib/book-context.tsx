@@ -9,6 +9,7 @@ import React, {
   useCallback,
   ReactNode,
 } from 'react';
+import { useSession } from 'next-auth/react';
 
 /* ─────────────────────────────────────────────────────────────────────────
    타입 정의
@@ -108,15 +109,20 @@ interface BookContextType {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   localStorage 헬퍼
+   localStorage 헬퍼 (userId별 격리)
 ───────────────────────────────────────────────────────────────────────── */
 
-const STORAGE_KEY = 'mystory_book_state';
+const GUEST_STORAGE_KEY = 'mystory_book_state_guest';
 
-function loadState(): BookState {
+function getStorageKey(userId: string | null | undefined): string {
+  return userId ? `mystory_book_state_${userId}` : GUEST_STORAGE_KEY;
+}
+
+function loadState(userId: string | null | undefined): BookState {
   if (typeof window === 'undefined') return DEFAULT_BOOK_STATE;
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const key = getStorageKey(userId);
+    const saved = localStorage.getItem(key);
     if (saved) {
       return { ...DEFAULT_BOOK_STATE, ...JSON.parse(saved) };
     }
@@ -126,12 +132,23 @@ function loadState(): BookState {
   return DEFAULT_BOOK_STATE;
 }
 
-function saveState(state: BookState) {
+function saveState(state: BookState, userId: string | null | undefined) {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const key = getStorageKey(userId);
+    localStorage.setItem(key, JSON.stringify(state));
   } catch (e) {
     console.warn('localStorage 저장 실패:', e);
+  }
+}
+
+function clearState(userId: string | null | undefined) {
+  if (typeof window === 'undefined') return;
+  try {
+    const key = getStorageKey(userId);
+    localStorage.removeItem(key);
+  } catch (e) {
+    console.warn('localStorage 삭제 실패:', e);
   }
 }
 
@@ -153,6 +170,9 @@ function isSupabaseConfigured(): boolean {
 const BookContext = createContext<BookContextType | undefined>(undefined);
 
 export function BookProvider({ children }: { children: ReactNode }) {
+  const { data: session, status } = useSession();
+  const userId = (session?.user as { id?: string })?.id ?? null;
+
   const [state, setState] = useState<BookState>(DEFAULT_BOOK_STATE);
   const [isHydrated, setIsHydrated] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -162,25 +182,51 @@ export function BookProvider({ children }: { children: ReactNode }) {
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 마지막으로 DB에 동기화한 상태 (변경 감지용)
   const lastSyncedRef = useRef<string>('');
+  // 마지막으로 로드한 userId (변경 감지용)
+  const lastUserIdRef = useRef<string | null>(undefined as unknown as null);
 
-  /* ── 초기 로드 ── */
+  /* ── 초기 로드 (클라이언트 하이드레이션) ── */
   useEffect(() => {
-    setState(loadState());
+    if (status === 'loading') return; // 세션 로딩 중 대기
+    setState(loadState(userId));
+    lastUserIdRef.current = userId;
     setIsHydrated(true);
-  }, []);
+  }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ── 로그인 시 guest → user 마이그레이션 ── */
+  useEffect(() => {
+    if (!isHydrated) return;
+    if (!userId) return;
+    if (lastUserIdRef.current === userId) return; // 이미 처리됨
+
+    const userKey = getStorageKey(userId);
+    const guestData = localStorage.getItem(GUEST_STORAGE_KEY);
+    const userData = localStorage.getItem(userKey);
+
+    if (guestData && !userData) {
+      // 비회원 상태를 회원 키로 마이그레이션
+      localStorage.setItem(userKey, guestData);
+    }
+
+    // 회원 상태로 교체
+    setState(loadState(userId));
+    lastUserIdRef.current = userId;
+    lastSyncedRef.current = '';
+  }, [userId, isHydrated]);
 
   /* ── localStorage 자동 저장 (500ms 디바운스) ── */
   useEffect(() => {
     if (!isHydrated) return;
-    const t = setTimeout(() => saveState(state), 500);
+    const t = setTimeout(() => saveState(state, userId), 500);
     return () => clearTimeout(t);
-  }, [state, isHydrated]);
+  }, [state, isHydrated, userId]);
 
-  /* ── Supabase 자동 동기화 (2s 디바운스, 설정된 경우만) ── */
+  /* ── Supabase 자동 동기화 (2s 디바운스, 로그인+설정된 경우만) ── */
   useEffect(() => {
     if (!isHydrated) return;
     if (!isSupabaseConfigured()) return;
-    if (!state.bookId) return; // bookId 없으면 sync 불가
+    if (!state.bookId) return;
+    if (!userId) return; // 비로그인 시 자동 sync 하지 않음
 
     const serialized = JSON.stringify({
       title: state.title,
@@ -188,7 +234,6 @@ export function BookProvider({ children }: { children: ReactNode }) {
       chapters: state.chapters,
     });
 
-    // 변경이 없으면 skip
     if (serialized === lastSyncedRef.current) return;
 
     if (syncTimer.current) clearTimeout(syncTimer.current);
@@ -200,7 +245,7 @@ export function BookProvider({ children }: { children: ReactNode }) {
       if (syncTimer.current) clearTimeout(syncTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.title, state.author, state.chapters, isHydrated]);
+  }, [state.title, state.author, state.chapters, isHydrated, userId]);
 
   /* ── 내부 동기화 함수 ── */
   const syncToDbInternal = useCallback(async (currentState: BookState) => {
@@ -219,6 +264,11 @@ export function BookProvider({ children }: { children: ReactNode }) {
         }),
       });
 
+      // 비로그인(401) 또는 권한 없음(403)이면 조용히 무시 (localStorage만 사용)
+      if (res.status === 401 || res.status === 403) {
+        return;
+      }
+
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || '동기화 실패');
@@ -226,7 +276,6 @@ export function BookProvider({ children }: { children: ReactNode }) {
 
       const { chapterIdMap } = await res.json();
 
-      // 로컬 챕터에 dbId 업데이트
       if (chapterIdMap && Object.keys(chapterIdMap).length > 0) {
         setState((prev) => ({
           ...prev,
@@ -236,7 +285,6 @@ export function BookProvider({ children }: { children: ReactNode }) {
         }));
       }
 
-      // 마지막 동기화 상태 기록
       lastSyncedRef.current = JSON.stringify({
         title: currentState.title,
         author: currentState.author,
@@ -269,6 +317,11 @@ export function BookProvider({ children }: { children: ReactNode }) {
           body: JSON.stringify({ title: state.title, author: state.author }),
         });
 
+        // 비로그인 시 조용히 무시 (localStorage만)
+        if (res.status === 401) {
+          return;
+        }
+
         if (!res.ok) {
           const data = await res.json();
           throw new Error(data.error || '책 생성 실패');
@@ -276,7 +329,6 @@ export function BookProvider({ children }: { children: ReactNode }) {
 
         const { book } = await res.json();
         setState((prev) => ({ ...prev, bookId: book.id }));
-        // bookId가 생기면 다음 effect에서 자동 sync됨
       } catch (err) {
         const msg = err instanceof Error ? err.message : '책 생성 오류';
         setSyncError(msg);
@@ -294,12 +346,14 @@ export function BookProvider({ children }: { children: ReactNode }) {
     setState((prev) => updater(prev));
   }, []);
 
-  /* ── 책 초기화 ── */
+  /* ── 책 초기화 (로그아웃 또는 새 책 시작 시) ── */
   const resetBook = useCallback(() => {
     const fresh = { ...DEFAULT_BOOK_STATE, createdAt: new Date().toISOString() };
     setState(fresh);
     lastSyncedRef.current = '';
-  }, []);
+    // 현재 사용자의 localStorage도 초기화
+    clearState(userId);
+  }, [userId]);
 
   /* ── Supabase에서 복원 ── */
   const restoreFromDb = useCallback(async (bookId: string): Promise<boolean> => {
@@ -310,7 +364,6 @@ export function BookProvider({ children }: { children: ReactNode }) {
       const { book, chapters: dbChapters } = await res.json();
       if (!book) return false;
 
-      // Supabase 형식 → 로컬 Chapter 형식 변환
       const chapters: Chapter[] = (dbChapters || [])
         .sort((a: any, b: any) => a.sort_order - b.sort_order)
         .map((dbCh: any) => ({
@@ -324,7 +377,6 @@ export function BookProvider({ children }: { children: ReactNode }) {
             .sort((a: any, b: any) => a.sort_order - b.sort_order)
             .map((m: any) => ({
               id: Math.random().toString(36).slice(2, 10),
-              // DB는 'ai'로 저장, 로컬은 'assistant'
               type: (m.type === 'ai' ? 'assistant' : m.type) as 'user' | 'assistant' | 'photo',
               text: m.text || m.photo_url || '',
               timestamp: Date.now(),

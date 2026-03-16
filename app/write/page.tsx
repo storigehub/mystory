@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSession, signIn } from 'next-auth/react';
+import { useSession, signIn, signOut } from 'next-auth/react';
 import { useBook } from '@/lib/book-context';
 import { TOKENS, FONT_SIZE_PRESETS } from '@/lib/design-tokens';
 import ChatEditor from '@/components/write/ChatEditor';
@@ -11,7 +11,7 @@ import NormalEditor from '@/components/write/NormalEditor';
 export default function WritePage() {
   const router = useRouter();
   const { data: session } = useSession();
-  const { state, isSyncing, syncError, setChapterMode, setProse, setCurrentChapterIdx, markChapterDone, setFontSize, syncToDb } = useBook();
+  const { state, isSyncing, syncError, setChapterMode, setProse, setCurrentChapterIdx, markChapterDone, setFontSize, syncToDb, resetBook } = useBook();
   const [showSidebar, setShowSidebar] = useState(false);
   const [showFinish, setShowFinish] = useState(false);
 
@@ -366,6 +366,42 @@ export default function WritePage() {
             >
               책 미리보기
             </button>
+
+            {/* 로그인 시: 내 정보 + 로그아웃 */}
+            {session && (
+              <div style={{ borderTop: `1px solid ${TOKENS.borderLight}`, paddingTop: 12, marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <button
+                  onClick={() => { setShowSidebar(false); router.push('/my'); }}
+                  style={{
+                    width: '100%', padding: '12px 0',
+                    border: `1px solid ${TOKENS.border}`,
+                    borderRadius: TOKENS.radiusSm,
+                    background: TOKENS.card,
+                    color: TOKENS.text,
+                    fontSize: 14, fontFamily: TOKENS.sans, cursor: 'pointer', minHeight: 48,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}
+                >
+                  👤 {session.user?.name || '내 정보'}
+                </button>
+                <button
+                  onClick={async () => {
+                    resetBook();
+                    await signOut({ callbackUrl: '/' });
+                  }}
+                  style={{
+                    width: '100%', padding: '12px 0',
+                    border: 'none',
+                    borderRadius: TOKENS.radiusSm,
+                    background: '#f5ede3',
+                    color: '#8c7a6a',
+                    fontSize: 14, fontFamily: TOKENS.sans, cursor: 'pointer', minHeight: 48,
+                  }}
+                >
+                  로그아웃
+                </button>
+              </div>
+            )}
           </div>
           <div onClick={() => setShowSidebar(false)} style={{ flex: 1, background: 'rgba(0,0,0,.25)' }} />
         </div>

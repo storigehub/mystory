@@ -1,7 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase';
+import { getSessionUserId, requireAuth } from '@/lib/auth-helpers';
 
 type Params = { params: { id: string } };
+
+/**
+ * 소유자 검증 헬퍼
+ * book.user_id가 있으면 현재 userId와 일치해야 함.
+ * 기존 비회원 데이터(user_id=null)는 누구나 접근 허용.
+ */
+function checkOwnership(
+  bookUserId: string | null,
+  currentUserId: string | null
+): NextResponse | null {
+  if (bookUserId && bookUserId !== currentUserId) {
+    return NextResponse.json({ error: '접근 권한이 없습니다' }, { status: 403 });
+  }
+  return null;
+}
 
 /**
  * GET /api/books/[id]
@@ -19,6 +35,11 @@ export async function GET(_req: NextRequest, { params }: Params) {
     if (bookErr) {
       return NextResponse.json({ error: bookErr.message }, { status: 404 });
     }
+
+    // 소유자 검증 (기존 비회원 책은 허용)
+    const userId = await getSessionUserId();
+    const ownerError = checkOwnership(book.user_id, userId);
+    if (ownerError) return ownerError;
 
     const { data: chapters, error: chErr } = await supabase
       .from('chapters')
@@ -47,6 +68,25 @@ export async function GET(_req: NextRequest, { params }: Params) {
  */
 export async function PUT(req: NextRequest, { params }: Params) {
   try {
+    const { userId, error: authError } = await requireAuth();
+    if (authError) return authError;
+
+    const supabase = createServerClient();
+
+    // 소유자 검증
+    const { data: book, error: fetchErr } = await supabase
+      .from('books')
+      .select('user_id')
+      .eq('id', params.id)
+      .single();
+
+    if (fetchErr) {
+      return NextResponse.json({ error: '책을 찾을 수 없습니다' }, { status: 404 });
+    }
+
+    const ownerError = checkOwnership(book.user_id, userId);
+    if (ownerError) return ownerError;
+
     const body = await req.json();
     const updates: Record<string, unknown> = {};
     if (body.title !== undefined) updates.title = body.title;
@@ -56,7 +96,6 @@ export async function PUT(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: '업데이트할 내용이 없습니다' }, { status: 400 });
     }
 
-    const supabase = createServerClient();
     const { error } = await supabase
       .from('books')
       .update(updates)
@@ -79,7 +118,25 @@ export async function PUT(req: NextRequest, { params }: Params) {
  */
 export async function DELETE(_req: NextRequest, { params }: Params) {
   try {
+    const { userId, error: authError } = await requireAuth();
+    if (authError) return authError;
+
     const supabase = createServerClient();
+
+    // 소유자 검증
+    const { data: book, error: fetchErr } = await supabase
+      .from('books')
+      .select('user_id')
+      .eq('id', params.id)
+      .single();
+
+    if (fetchErr) {
+      return NextResponse.json({ error: '책을 찾을 수 없습니다' }, { status: 404 });
+    }
+
+    const ownerError = checkOwnership(book.user_id, userId);
+    if (ownerError) return ownerError;
+
     const { error } = await supabase
       .from('books')
       .delete()
