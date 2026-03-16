@@ -72,7 +72,7 @@ interface NormalEditorProps {
 }
 
 export default function NormalEditor({ chapter, chapterIdx }: NormalEditorProps) {
-  const { state, setProse, addPhoto, removePhoto, updatePhotoCaption } = useBook();
+  const { state, setProse, addPhoto, removePhoto, updatePhotoCaption, setPhotoFeatured } = useBook();
   const [showGuide, setShowGuide] = useState(!chapter.prose?.length);
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
@@ -385,13 +385,48 @@ export default function NormalEditor({ chapter, chapterIdx }: NormalEditorProps)
             if (!photo) return null;
 
             return (
-              <div key={block.bid} style={{ background: TOKENS.card, borderRadius: TOKENS.radiusSm, overflow: 'hidden', border: `1px solid ${TOKENS.borderLight}`, marginBottom: 8, boxShadow: TOKENS.shadowSm }}>
+              <div
+                key={block.bid}
+                style={{
+                  background: TOKENS.card,
+                  borderRadius: TOKENS.radiusSm,
+                  overflow: 'hidden',
+                  border: `1.5px solid ${photo.isFeatured ? '#b0986a' : TOKENS.borderLight}`,
+                  marginBottom: 8,
+                  boxShadow: photo.isFeatured ? '0 0 0 2px rgba(176,152,106,0.25)' : TOKENS.shadowSm,
+                }}
+              >
                 <div style={{ position: 'relative' }}>
                   <img src={photo.data} alt="" style={{ width: '100%', display: 'block', maxHeight: 320, objectFit: 'cover' }} />
+                  {/* 삭제 버튼 */}
                   <button
                     onClick={() => removePhotoBlock(block.bid, block.photoId)}
                     style={{ position: 'absolute', top: 8, right: 8, width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,0,0,.45)', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}
+                    title="사진 삭제"
                   >×</button>
+                  {/* 대표사진 토글 */}
+                  <button
+                    onClick={() => setPhotoFeatured(chapterIdxRef.current, photo.id, !photo.isFeatured)}
+                    title={photo.isFeatured ? '대표사진 해제' : '대표사진으로 설정 (섹션 헤더 배경)'}
+                    style={{
+                      position: 'absolute',
+                      top: 8,
+                      left: 8,
+                      borderRadius: 20,
+                      background: photo.isFeatured ? 'rgba(176,152,106,0.9)' : 'rgba(0,0,0,0.45)',
+                      color: '#fff',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '4px 10px',
+                      fontSize: 12,
+                      fontFamily: TOKENS.sans,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    {photo.isFeatured ? '★ 대표사진' : '☆ 대표사진'}
+                  </button>
                 </div>
                 <input
                   value={photo.caption || ''}

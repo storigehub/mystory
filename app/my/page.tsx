@@ -4,9 +4,9 @@ import { useEffect, useState, useCallback } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useBook } from '@/lib/book-context';
+import { TOKENS } from '@/lib/design-tokens';
 
 /* ─── 타입 ─── */
-
 interface BookSummary {
   id: string;
   title: string;
@@ -25,14 +25,32 @@ interface ChapterSummary {
 }
 
 /* ─── 날짜 포맷 ─── */
-
 function formatDate(iso: string): string {
   const d = new Date(iso);
+  const now = new Date();
+  const diff = Math.floor((now.getTime() - d.getTime()) / 86400000);
+  if (diff === 0) return '오늘';
+  if (diff === 1) return '어제';
+  if (diff < 7) return `${diff}일 전`;
   return `${d.getMonth() + 1}월 ${d.getDate()}일`;
 }
 
-/* ─── 메인 컴포넌트 ─── */
+/* ─── 책 표지 미니 썸네일 (CSS gradient) ─── */
+const COVER_GRADIENTS = [
+  `linear-gradient(160deg, #3D3530, #2C2824)`,
+  `linear-gradient(160deg, #1a2a4a, #0d1b2e)`,
+  `linear-gradient(160deg, #704214, #9B6A2F)`,
+  `linear-gradient(160deg, #4a3728, #2c1f16)`,
+  `linear-gradient(160deg, #2d4a3e, #1a2d26)`,
+];
 
+function coverGradient(title: string) {
+  let hash = 0;
+  for (let i = 0; i < title.length; i++) hash = (hash * 31 + title.charCodeAt(i)) & 0xffff;
+  return COVER_GRADIENTS[hash % COVER_GRADIENTS.length];
+}
+
+/* ─── 메인 컴포넌트 ─── */
 export default function MyPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -47,21 +65,17 @@ export default function MyPage() {
   const [books, setBooks] = useState<BookSummary[]>([]);
   const [booksLoading, setBooksLoading] = useState(true);
 
-  // 아코디언: bookId → 챕터 목록
   const [expandedBook, setExpandedBook] = useState<string | null>(null);
   const [chaptersMap, setChaptersMap] = useState<Record<string, ChapterSummary[]>>({});
   const [chaptersLoading, setChaptersLoading] = useState<string | null>(null);
 
-  // 삭제 확인 모달
   const [deleteTarget, setDeleteTarget] = useState<BookSummary | null>(null);
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   /* ── 비로그인 리다이렉트 ── */
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.replace('/login');
-    }
+    if (status === 'unauthenticated') router.replace('/login');
   }, [status, router]);
 
   /* ── 닉네임 로드 ── */
@@ -92,22 +106,14 @@ export default function MyPage() {
   }, []);
 
   useEffect(() => {
-    if (status === 'authenticated') {
-      loadBooks();
-    }
+    if (status === 'authenticated') loadBooks();
   }, [status, loadBooks]);
 
   /* ── 닉네임 저장 ── */
   const saveNickname = async () => {
     const trimmed = nicknameInput.trim();
-    if (!trimmed) {
-      setNicknameError('닉네임을 입력해주세요');
-      return;
-    }
-    if (trimmed.length > 20) {
-      setNicknameError('20자 이내로 입력해주세요');
-      return;
-    }
+    if (!trimmed) { setNicknameError('닉네임을 입력해주세요'); return; }
+    if (trimmed.length > 20) { setNicknameError('20자 이내로 입력해주세요'); return; }
     setNicknameSaving(true);
     setNicknameError('');
     try {
@@ -116,7 +122,7 @@ export default function MyPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nickname: trimmed }),
       });
-      if (!res.ok) throw new Error('저장 실패');
+      if (!res.ok) throw new Error();
       setNickname(trimmed);
       setIsEditingNickname(false);
     } catch {
@@ -128,13 +134,9 @@ export default function MyPage() {
 
   /* ── 챕터 목록 로드 ── */
   const toggleChapters = async (bookId: string) => {
-    if (expandedBook === bookId) {
-      setExpandedBook(null);
-      return;
-    }
+    if (expandedBook === bookId) { setExpandedBook(null); return; }
     setExpandedBook(bookId);
-    if (chaptersMap[bookId]) return; // 이미 로드됨
-
+    if (chaptersMap[bookId]) return;
     setChaptersLoading(bookId);
     try {
       const res = await fetch(`/api/books/${bookId}`);
@@ -150,22 +152,16 @@ export default function MyPage() {
     }
   };
 
-  /* ── 이어쓰기 ── */
   const continueBook = async (bookId: string) => {
     const ok = await restoreFromDb(bookId);
     if (ok) router.push('/write');
   };
 
-  /* ── 챕터 이어쓰기 ── */
   const continueChapter = async (bookId: string, chapterIdx: number) => {
     const ok = await restoreFromDb(bookId);
-    if (ok) {
-      setCurrentChapterIdx(chapterIdx);
-      router.push('/write');
-    }
+    if (ok) { setCurrentChapterIdx(chapterIdx); router.push('/write'); }
   };
 
-  /* ── 책 삭제 ── */
   const deleteBook = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -181,182 +177,288 @@ export default function MyPage() {
     }
   };
 
-  /* ── 로그아웃 ── */
   const handleLogout = async () => {
     resetBook();
     await signOut({ callbackUrl: '/' });
   };
 
-  /* ── 로딩 중 ── */
   if (status === 'loading') {
     return (
-      <div style={styles.loadingWrap}>
-        <p style={styles.loadingText}>잠시만요...</p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: TOKENS.bg }}>
+        <p style={{ fontSize: 16, color: TOKENS.muted, fontFamily: TOKENS.sans }}>잠시만요...</p>
       </div>
     );
   }
-
   if (status === 'unauthenticated') return null;
 
   const email = session?.user?.email ?? '';
 
   return (
-    <div style={styles.page}>
-      {/* 헤더 */}
-      <div style={styles.header}>
-        <button style={styles.backBtn} onClick={() => router.back()}>
+    <div style={{ minHeight: '100vh', background: TOKENS.bg, fontFamily: TOKENS.serif, color: TOKENS.text }}>
+
+      {/* ── 헤더 ── */}
+      <header style={{
+        position: 'sticky', top: 0, zIndex: 10,
+        background: 'rgba(250,250,248,0.95)', backdropFilter: 'blur(12px)',
+        borderBottom: `1px solid ${TOKENS.borderLight}`,
+        display: 'flex', alignItems: 'center', padding: '0 20px', height: 52,
+        gap: 12,
+      }}>
+        <button
+          onClick={() => router.back()}
+          style={{ background: 'none', border: 'none', color: TOKENS.subtext, fontSize: 14, cursor: 'pointer', fontFamily: TOKENS.sans, padding: '8px 0', minHeight: 44 }}
+        >
           ← 뒤로
         </button>
-        <h1 style={styles.headerTitle}>내 정보</h1>
-        <div style={{ width: 80 }} />
-      </div>
+        <span style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em' }}>
+          나의이야기
+        </span>
+        <button
+          onClick={handleLogout}
+          style={{ background: 'none', border: `1px solid ${TOKENS.border}`, borderRadius: TOKENS.radiusSm, color: TOKENS.muted, fontSize: 13, cursor: 'pointer', fontFamily: TOKENS.sans, padding: '6px 12px', minHeight: 36 }}
+        >
+          로그아웃
+        </button>
+      </header>
 
-      <div style={styles.content}>
-        {/* 프로필 카드 */}
-        <section style={styles.card}>
-          <div style={styles.profileRow}>
-            <div style={styles.avatar}>
-              {(nickname || email).slice(0, 1).toUpperCase()}
-            </div>
-            <div style={styles.profileInfo}>
-              {isEditingNickname ? (
-                <div style={styles.nicknameEditWrap}>
-                  <input
-                    style={styles.nicknameInput}
-                    value={nicknameInput}
-                    onChange={(e) => setNicknameInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') saveNickname(); }}
-                    placeholder="닉네임 (최대 20자)"
-                    maxLength={20}
-                    autoFocus
-                  />
-                  {nicknameError && (
-                    <p style={styles.errorText}>{nicknameError}</p>
-                  )}
-                  <div style={styles.nicknameBtns}>
-                    <button
-                      style={{ ...styles.btn, ...styles.btnPrimary }}
-                      onClick={saveNickname}
-                      disabled={nicknameSaving}
-                    >
-                      {nicknameSaving ? '저장 중...' : '저장'}
-                    </button>
-                    <button
-                      style={{ ...styles.btn, ...styles.btnGhost }}
-                      onClick={() => {
-                        setIsEditingNickname(false);
-                        setNicknameInput(nickname);
-                        setNicknameError('');
-                      }}
-                    >
-                      취소
-                    </button>
-                  </div>
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px 80px' }}>
+
+        {/* ── 프로필 ── */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 16,
+          padding: '20px 24px',
+          background: TOKENS.card,
+          borderRadius: 12,
+          border: `1px solid ${TOKENS.borderLight}`,
+          boxShadow: TOKENS.shadowLg,
+          marginBottom: 32,
+        }}>
+          {/* 아바타 */}
+          <div style={{
+            width: 52, height: 52, borderRadius: '50%',
+            background: `linear-gradient(135deg, ${TOKENS.accent}, #c8924a)`,
+            color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 22, fontWeight: 600, flexShrink: 0,
+          }}>
+            {(nickname || email).slice(0, 1).toUpperCase()}
+          </div>
+
+          {/* 이름/이메일 */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {isEditingNickname ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <input
+                  value={nicknameInput}
+                  onChange={(e) => setNicknameInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') saveNickname(); }}
+                  placeholder="닉네임 (최대 20자)"
+                  maxLength={20}
+                  autoFocus
+                  style={{
+                    border: `1.5px solid ${TOKENS.accent}`, borderRadius: TOKENS.radiusSm,
+                    padding: '8px 12px', fontSize: 16, outline: 'none',
+                    fontFamily: TOKENS.serif, color: TOKENS.text,
+                  }}
+                />
+                {nicknameError && <p style={{ fontSize: 12, color: '#e53e3e', margin: 0, fontFamily: TOKENS.sans }}>{nicknameError}</p>}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={saveNickname} disabled={nicknameSaving}
+                    style={{ background: TOKENS.dark, color: '#fff', border: 'none', borderRadius: TOKENS.radiusSm, padding: '8px 16px', fontSize: 13, fontFamily: TOKENS.sans, cursor: 'pointer', minHeight: 36 }}>
+                    {nicknameSaving ? '저장 중…' : '저장'}
+                  </button>
+                  <button onClick={() => { setIsEditingNickname(false); setNicknameInput(nickname); setNicknameError(''); }}
+                    style={{ background: 'transparent', color: TOKENS.muted, border: `1px solid ${TOKENS.border}`, borderRadius: TOKENS.radiusSm, padding: '8px 16px', fontSize: 13, fontFamily: TOKENS.sans, cursor: 'pointer', minHeight: 36 }}>
+                    취소
+                  </button>
                 </div>
-              ) : (
-                <div style={styles.nicknameRow}>
-                  <span style={styles.nickname}>
-                    {nickname || '닉네임 없음'}
-                  </span>
-                  <button
-                    style={styles.editBtn}
-                    onClick={() => setIsEditingNickname(true)}
-                    title="닉네임 수정"
-                  >
+              </div>
+            ) : (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                  <span style={{ fontSize: 17, fontWeight: 600, color: TOKENS.text }}>{nickname || '닉네임 없음'}</span>
+                  <button onClick={() => setIsEditingNickname(true)}
+                    style={{ background: 'none', border: 'none', color: TOKENS.muted, fontSize: 13, cursor: 'pointer', fontFamily: TOKENS.sans, padding: '2px 6px' }}>
                     ✏ 수정
                   </button>
                 </div>
-              )}
-              <span style={styles.email}>{email}</span>
-            </div>
+                <p style={{ fontSize: 13, color: TOKENS.muted, margin: 0, fontFamily: TOKENS.sans }}>{email}</p>
+              </div>
+            )}
           </div>
-        </section>
+        </div>
 
-        {/* 내 책 보관함 */}
-        <section style={styles.section}>
-          <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitle}>내 책 보관함</h2>
+        {/* ── 내 책 보관함 헤더 ── */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0, letterSpacing: '-0.02em' }}>내 책 보관함</h2>
+          <button
+            onClick={() => router.push('/')}
+            style={{
+              background: TOKENS.dark, color: '#FAFAF9',
+              border: 'none', borderRadius: TOKENS.radiusSm,
+              padding: '8px 16px', fontSize: 13, fontFamily: TOKENS.sans,
+              fontWeight: 500, cursor: 'pointer', minHeight: 36,
+            }}
+          >
+            + 새 책 만들기
+          </button>
+        </div>
+
+        {/* ── 책 목록 ── */}
+        {booksLoading ? (
+          <div style={{ textAlign: 'center', padding: '48px 0', color: TOKENS.muted, fontFamily: TOKENS.sans, fontSize: 14 }}>
+            불러오는 중…
+          </div>
+        ) : books.length === 0 ? (
+          <div style={{
+            textAlign: 'center', padding: '60px 20px',
+            background: TOKENS.card, borderRadius: 12,
+            border: `1px solid ${TOKENS.borderLight}`,
+          }}>
+            <p style={{ fontSize: 16, color: TOKENS.muted, marginBottom: 20, fontFamily: TOKENS.sans }}>
+              아직 작성한 책이 없습니다
+            </p>
             <button
-              style={{ ...styles.btn, ...styles.btnPrimary }}
               onClick={() => router.push('/')}
+              style={{ background: TOKENS.dark, color: '#FAFAF9', border: 'none', borderRadius: TOKENS.radiusSm, padding: '12px 24px', fontSize: 15, fontFamily: TOKENS.sans, cursor: 'pointer', minHeight: 48 }}
             >
-              + 새 책 만들기
+              첫 번째 책 시작하기
             </button>
           </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {books.map((book) => {
+              const isExpanded = expandedBook === book.id;
+              const grad = coverGradient(book.title);
 
-          {booksLoading ? (
-            <p style={styles.emptyText}>불러오는 중...</p>
-          ) : books.length === 0 ? (
-            <div style={styles.emptyCard}>
-              <p style={styles.emptyText}>아직 작성한 책이 없어요.</p>
-              <button
-                style={{ ...styles.btn, ...styles.btnPrimary, marginTop: 16 }}
-                onClick={() => router.push('/')}
-              >
-                첫 번째 책 시작하기
-              </button>
-            </div>
-          ) : (
-            <div style={styles.bookList}>
-              {books.map((book) => (
-                <div key={book.id} style={styles.bookCard}>
-                  {/* 책 정보 */}
-                  <div style={styles.bookMeta}>
-                    <span style={styles.bookTitle}>{book.title}</span>
-                    <span style={styles.bookInfo}>
-                      {book.author} · 마지막 수정 {formatDate(book.updated_at)}
-                    </span>
-                    <span style={styles.bookInfo}>
-                      챕터 {book.chapter_count}개
-                    </span>
+              return (
+                <div key={book.id} style={{
+                  background: TOKENS.card,
+                  borderRadius: 12,
+                  border: `1px solid ${TOKENS.borderLight}`,
+                  boxShadow: TOKENS.shadowLg,
+                  overflow: 'hidden',
+                }}>
+                  {/* ── 책 카드 본문 ── */}
+                  <div style={{ display: 'flex', gap: 0 }}>
+                    {/* 왼쪽: 표지 썸네일 */}
+                    <div style={{
+                      width: 96, flexShrink: 0,
+                      background: grad,
+                      display: 'flex', flexDirection: 'column',
+                      alignItems: 'center', justifyContent: 'center',
+                      padding: '20px 10px', minHeight: 130,
+                      color: 'rgba(255,255,255,0.9)',
+                    }}>
+                      <div style={{ width: 24, height: 1, background: 'rgba(255,255,255,0.3)', marginBottom: 10 }} />
+                      <p style={{
+                        fontSize: 11, fontWeight: 400, lineHeight: 1.4,
+                        textAlign: 'center', wordBreak: 'keep-all',
+                        letterSpacing: '-0.01em', maxWidth: 72,
+                      }}>
+                        {book.title}
+                      </p>
+                      <div style={{ width: 24, height: 1, background: 'rgba(255,255,255,0.3)', marginTop: 10 }} />
+                    </div>
+
+                    {/* 오른쪽: 책 정보 + 액션 */}
+                    <div style={{ flex: 1, padding: '18px 18px 14px', display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
+                      {/* 제목 */}
+                      <h3 style={{ fontSize: 17, fontWeight: 600, margin: 0, lineHeight: 1.3, letterSpacing: '-0.02em', color: TOKENS.text }}>
+                        {book.title}
+                      </h3>
+
+                      {/* 저자 · 날짜 */}
+                      <p style={{ fontSize: 13, color: TOKENS.muted, margin: 0, fontFamily: TOKENS.sans }}>
+                        {book.author || '저자 미상'} · {formatDate(book.updated_at)} 수정
+                      </p>
+
+                      {/* 챕터 통계 */}
+                      <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
+                        <span style={{
+                          fontSize: 11, color: TOKENS.accent, fontFamily: TOKENS.sans,
+                          background: '#fbf7f0', borderRadius: 20, padding: '3px 10px',
+                          border: `1px solid ${TOKENS.accentBorder}`,
+                        }}>
+                          {book.chapter_count}개 챕터
+                        </span>
+                      </div>
+
+                      {/* 액션 버튼 */}
+                      <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                        <button
+                          onClick={() => continueBook(book.id)}
+                          style={{
+                            background: TOKENS.dark, color: '#FAFAF9',
+                            border: 'none', borderRadius: TOKENS.radiusSm,
+                            padding: '8px 16px', fontSize: 13, fontFamily: TOKENS.sans,
+                            fontWeight: 500, cursor: 'pointer', minHeight: 36,
+                          }}
+                        >
+                          이어쓰기
+                        </button>
+                        <button
+                          onClick={() => toggleChapters(book.id)}
+                          style={{
+                            background: 'transparent', color: TOKENS.subtext,
+                            border: `1px solid ${TOKENS.border}`, borderRadius: TOKENS.radiusSm,
+                            padding: '8px 14px', fontSize: 13, fontFamily: TOKENS.sans,
+                            cursor: 'pointer', minHeight: 36,
+                          }}
+                        >
+                          목차 {isExpanded ? '▲' : '▼'}
+                        </button>
+                        <button
+                          onClick={() => { setDeleteTarget(book); setDeleteConfirmed(false); }}
+                          style={{
+                            background: 'transparent', color: '#c0392b',
+                            border: `1px solid #f5c6c0`, borderRadius: TOKENS.radiusSm,
+                            padding: '8px 14px', fontSize: 13, fontFamily: TOKENS.sans,
+                            cursor: 'pointer', minHeight: 36,
+                          }}
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* 액션 버튼 */}
-                  <div style={styles.bookActions}>
-                    <button
-                      style={{ ...styles.btn, ...styles.btnPrimary }}
-                      onClick={() => continueBook(book.id)}
-                    >
-                      이어쓰기
-                    </button>
-                    <button
-                      style={{ ...styles.btn, ...styles.btnOutline }}
-                      onClick={() => toggleChapters(book.id)}
-                    >
-                      챕터 목록 {expandedBook === book.id ? '▲' : '▼'}
-                    </button>
-                    <button
-                      style={{ ...styles.btn, ...styles.btnDanger }}
-                      onClick={() => {
-                        setDeleteTarget(book);
-                        setDeleteConfirmed(false);
-                      }}
-                    >
-                      삭제
-                    </button>
-                  </div>
-
-                  {/* 챕터 아코디언 */}
-                  {expandedBook === book.id && (
-                    <div style={styles.chapterList}>
+                  {/* ── 챕터 목록 (아코디언) ── */}
+                  {isExpanded && (
+                    <div style={{ borderTop: `1px solid ${TOKENS.borderLight}` }}>
                       {chaptersLoading === book.id ? (
-                        <p style={styles.chapterItem}>불러오는 중...</p>
+                        <div style={{ padding: '16px 20px', color: TOKENS.muted, fontFamily: TOKENS.sans, fontSize: 13 }}>
+                          불러오는 중…
+                        </div>
                       ) : (chaptersMap[book.id] || []).length === 0 ? (
-                        <p style={styles.chapterItem}>챕터가 없습니다.</p>
+                        <div style={{ padding: '16px 20px', color: TOKENS.muted, fontFamily: TOKENS.sans, fontSize: 13 }}>
+                          챕터가 없습니다.
+                        </div>
                       ) : (
                         (chaptersMap[book.id] || []).map((ch, idx) => (
                           <button
                             key={ch.id}
-                            style={styles.chapterRow}
                             onClick={() => continueChapter(book.id, idx)}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 14,
+                              padding: '13px 20px', width: '100%',
+                              background: idx % 2 === 0 ? TOKENS.card : TOKENS.bg,
+                              border: 'none', borderBottom: `1px solid ${TOKENS.borderLight}`,
+                              cursor: 'pointer', textAlign: 'left',
+                              fontFamily: TOKENS.serif, minHeight: 52,
+                            }}
                           >
-                            <span style={styles.chapterNum}>
+                            <span style={{ fontSize: 11, color: TOKENS.muted, fontFamily: TOKENS.sans, minWidth: 24, fontWeight: 600 }}>
                               {String(idx + 1).padStart(2, '0')}
                             </span>
-                            <span style={styles.chapterTitle}>{ch.title}</span>
+                            <span style={{ flex: 1, fontSize: 15, color: TOKENS.text, lineHeight: 1.4 }}>
+                              {ch.title}
+                            </span>
                             <span style={{
-                              ...styles.chapterBadge,
-                              ...(ch.is_done ? styles.badgeDone : styles.badgePending),
+                              fontSize: 11, padding: '3px 9px', borderRadius: 12, fontFamily: TOKENS.sans, fontWeight: 500,
+                              ...(ch.is_done
+                                ? { background: '#e8f5e9', color: '#2e7d32' }
+                                : { background: '#fff8e8', color: '#b45309' }
+                              ),
                             }}>
                               {ch.is_done ? '완료' : '작성 중'}
                             </span>
@@ -366,63 +468,51 @@ export default function MyPage() {
                     </div>
                   )}
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* 로그아웃 */}
-        <section style={styles.section}>
-          <button
-            style={{ ...styles.btn, ...styles.btnLogout }}
-            onClick={handleLogout}
-          >
-            로그아웃
-          </button>
-        </section>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* 삭제 확인 모달 */}
+      {/* ── 삭제 확인 모달 (바텀 시트) ── */}
       {deleteTarget && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modal}>
-            <h2 style={styles.modalTitle}>책을 삭제할까요?</h2>
-            <p style={styles.modalBody}>
-              「{deleteTarget.title}」을 삭제하면 모든 챕터와 내용이 사라집니다.
-              <br />이 작업은 되돌릴 수 없습니다.
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 0 env(safe-area-inset-bottom)' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setDeleteTarget(null); }}
+        >
+          <div style={{
+            background: TOKENS.card, borderRadius: '16px 16px 0 0',
+            padding: '28px 24px 32px', width: '100%', maxWidth: 480,
+            display: 'flex', flexDirection: 'column', gap: 16,
+          }}>
+            <div style={{ width: 36, height: 4, background: TOKENS.border, borderRadius: 2, margin: '0 auto' }} />
+            <h2 style={{ fontSize: 19, fontWeight: 600, margin: 0, color: TOKENS.text }}>책을 삭제할까요?</h2>
+            <p style={{ fontSize: 15, color: TOKENS.subtext, lineHeight: 1.6, margin: 0, fontFamily: TOKENS.sans }}>
+              「{deleteTarget.title}」을 삭제하면 모든 챕터와 내용이 사라집니다.<br />이 작업은 되돌릴 수 없습니다.
             </p>
 
             {!deleteConfirmed ? (
-              <div style={styles.modalBtns}>
-                <button
-                  style={{ ...styles.btn, ...styles.btnDanger, flex: 1 }}
-                  onClick={() => setDeleteConfirmed(true)}
-                >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+                <button onClick={() => setDeleteConfirmed(true)}
+                  style={{ padding: '14px', background: '#fdf0ee', color: '#c0392b', border: `1px solid #f5c6c0`, borderRadius: TOKENS.radiusSm, fontSize: 16, fontFamily: TOKENS.sans, cursor: 'pointer', minHeight: 52 }}>
                   네, 삭제하겠습니다
                 </button>
-                <button
-                  style={{ ...styles.btn, ...styles.btnGhost, flex: 1 }}
-                  onClick={() => setDeleteTarget(null)}
-                >
+                <button onClick={() => setDeleteTarget(null)}
+                  style={{ padding: '14px', background: TOKENS.warm, color: TOKENS.muted, border: 'none', borderRadius: TOKENS.radiusSm, fontSize: 16, fontFamily: TOKENS.sans, cursor: 'pointer', minHeight: 52 }}>
                   취소
                 </button>
               </div>
             ) : (
-              <div style={styles.modalBtns}>
-                <p style={styles.confirmText}>
-                  정말 삭제합니다. 아래 버튼을 한 번 더 눌러주세요.
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+                <p style={{ fontSize: 14, color: '#c0392b', margin: 0, fontFamily: TOKENS.sans }}>
+                  ⚠️ 정말 삭제합니다. 아래 버튼을 한 번 더 눌러주세요.
                 </p>
-                <button
-                  style={{ ...styles.btn, ...styles.btnDangerFull }}
-                  onClick={deleteBook}
-                  disabled={deleting}
-                >
-                  {deleting ? '삭제 중...' : '최종 삭제'}
+                <button onClick={deleteBook} disabled={deleting}
+                  style={{ padding: '14px', background: '#c0392b', color: '#fff', border: 'none', borderRadius: TOKENS.radiusSm, fontSize: 17, fontFamily: TOKENS.sans, fontWeight: 600, cursor: deleting ? 'wait' : 'pointer', minHeight: 52 }}>
+                  {deleting ? '삭제 중…' : '최종 삭제'}
                 </button>
-                <button
-                  style={{ ...styles.btn, ...styles.btnGhost, width: '100%' }}
-                  onClick={() => { setDeleteTarget(null); setDeleteConfirmed(false); }}
-                >
+                <button onClick={() => { setDeleteTarget(null); setDeleteConfirmed(false); }}
+                  style={{ padding: '14px', background: TOKENS.warm, color: TOKENS.muted, border: 'none', borderRadius: TOKENS.radiusSm, fontSize: 16, fontFamily: TOKENS.sans, cursor: 'pointer', minHeight: 52 }}>
                   취소
                 </button>
               </div>
@@ -433,371 +523,3 @@ export default function MyPage() {
     </div>
   );
 }
-
-/* ─────────────────────────────────────────────────────────────────────────
-   스타일 (어르신 UI — 큰 폰트, 넉넉한 터치 타깃)
-───────────────────────────────────────────────────────────────────────── */
-
-const BROWN = '#7c5c3e';
-const LIGHT_BROWN = '#f5ede3';
-const BORDER = '#e0cfc0';
-const DANGER = '#c0392b';
-const DANGER_LIGHT = '#fdf0ee';
-const TEXT_MAIN = '#3a2a1a';
-const TEXT_SUB = '#8c7a6a';
-
-const styles: Record<string, React.CSSProperties> = {
-  page: {
-    minHeight: '100vh',
-    background: '#fdf8f3',
-    fontFamily: "'Noto Serif KR', Georgia, serif",
-    color: TEXT_MAIN,
-  },
-  loadingWrap: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: '100vh',
-    background: '#fdf8f3',
-  },
-  loadingText: {
-    fontSize: 18,
-    color: TEXT_SUB,
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '16px 20px',
-    background: '#fff',
-    borderBottom: `1px solid ${BORDER}`,
-    position: 'sticky',
-    top: 0,
-    zIndex: 10,
-  },
-  backBtn: {
-    background: 'none',
-    border: 'none',
-    fontSize: 16,
-    color: BROWN,
-    cursor: 'pointer',
-    padding: '8px 4px',
-    minHeight: 44,
-    minWidth: 80,
-    textAlign: 'left',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 700,
-    margin: 0,
-    color: TEXT_MAIN,
-  },
-  content: {
-    maxWidth: 640,
-    margin: '0 auto',
-    padding: '20px 16px 60px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 20,
-  },
-
-  /* 카드 */
-  card: {
-    background: '#fff',
-    borderRadius: 12,
-    border: `1px solid ${BORDER}`,
-    padding: 20,
-  },
-  profileRow: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: 16,
-  },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: '50%',
-    background: BROWN,
-    color: '#fff',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: 24,
-    fontWeight: 700,
-    flexShrink: 0,
-  },
-  profileInfo: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 4,
-  },
-  nicknameRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-  },
-  nickname: {
-    fontSize: 20,
-    fontWeight: 700,
-    color: TEXT_MAIN,
-  },
-  editBtn: {
-    background: 'none',
-    border: `1px solid ${BORDER}`,
-    borderRadius: 6,
-    padding: '4px 10px',
-    fontSize: 13,
-    color: BROWN,
-    cursor: 'pointer',
-    minHeight: 32,
-  },
-  email: {
-    fontSize: 15,
-    color: TEXT_SUB,
-  },
-  nicknameEditWrap: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 8,
-  },
-  nicknameInput: {
-    border: `2px solid ${BROWN}`,
-    borderRadius: 8,
-    padding: '10px 12px',
-    fontSize: 18,
-    outline: 'none',
-    color: TEXT_MAIN,
-    fontFamily: "'Noto Serif KR', Georgia, serif",
-  },
-  nicknameBtns: {
-    display: 'flex',
-    gap: 8,
-  },
-  errorText: {
-    fontSize: 14,
-    color: DANGER,
-    margin: 0,
-  },
-
-  /* 섹션 */
-  section: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 12,
-  },
-  sectionHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 700,
-    margin: 0,
-    color: TEXT_MAIN,
-  },
-
-  /* 책 목록 */
-  bookList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 12,
-  },
-  bookCard: {
-    background: '#fff',
-    borderRadius: 12,
-    border: `1px solid ${BORDER}`,
-    padding: 16,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 12,
-  },
-  bookMeta: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 4,
-  },
-  bookTitle: {
-    fontSize: 18,
-    fontWeight: 700,
-    color: TEXT_MAIN,
-  },
-  bookInfo: {
-    fontSize: 14,
-    color: TEXT_SUB,
-  },
-  bookActions: {
-    display: 'flex',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-
-  /* 챕터 아코디언 */
-  chapterList: {
-    borderTop: `1px solid ${BORDER}`,
-    paddingTop: 12,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 4,
-  },
-  chapterRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    padding: '12px 8px',
-    background: LIGHT_BROWN,
-    border: 'none',
-    borderRadius: 8,
-    cursor: 'pointer',
-    textAlign: 'left',
-    minHeight: 52,
-    fontFamily: "'Noto Serif KR', Georgia, serif",
-  },
-  chapterItem: {
-    fontSize: 14,
-    color: TEXT_SUB,
-    padding: '8px 0',
-  },
-  chapterNum: {
-    fontSize: 13,
-    color: TEXT_SUB,
-    fontWeight: 700,
-    minWidth: 28,
-  },
-  chapterTitle: {
-    flex: 1,
-    fontSize: 16,
-    color: TEXT_MAIN,
-  },
-  chapterBadge: {
-    fontSize: 12,
-    padding: '3px 8px',
-    borderRadius: 12,
-    fontWeight: 600,
-  },
-  badgeDone: {
-    background: '#e8f5e9',
-    color: '#2e7d32',
-  },
-  badgePending: {
-    background: '#fff3e0',
-    color: '#e65100',
-  },
-
-  /* 빈 상태 */
-  emptyCard: {
-    background: '#fff',
-    borderRadius: 12,
-    border: `1px solid ${BORDER}`,
-    padding: 32,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 16,
-    color: TEXT_SUB,
-    textAlign: 'center',
-    margin: 0,
-  },
-
-  /* 버튼 공통 */
-  btn: {
-    border: 'none',
-    borderRadius: 8,
-    padding: '12px 18px',
-    fontSize: 16,
-    fontWeight: 600,
-    cursor: 'pointer',
-    minHeight: 52,
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontFamily: "'Noto Serif KR', Georgia, serif",
-    whiteSpace: 'nowrap',
-    transition: 'opacity 0.15s',
-  },
-  btnPrimary: {
-    background: BROWN,
-    color: '#fff',
-  },
-  btnOutline: {
-    background: '#fff',
-    color: BROWN,
-    border: `1.5px solid ${BROWN}`,
-  },
-  btnGhost: {
-    background: LIGHT_BROWN,
-    color: TEXT_MAIN,
-  },
-  btnDanger: {
-    background: DANGER_LIGHT,
-    color: DANGER,
-    border: `1px solid #f5c6c0`,
-  },
-  btnDangerFull: {
-    background: DANGER,
-    color: '#fff',
-    width: '100%',
-    padding: '16px',
-    fontSize: 18,
-    borderRadius: 8,
-    border: 'none',
-    cursor: 'pointer',
-    minHeight: 56,
-    fontFamily: "'Noto Serif KR', Georgia, serif",
-    fontWeight: 700,
-  },
-  btnLogout: {
-    background: LIGHT_BROWN,
-    color: TEXT_SUB,
-    width: '100%',
-    fontSize: 17,
-  },
-
-  /* 삭제 모달 */
-  modalOverlay: {
-    position: 'fixed',
-    inset: 0,
-    background: 'rgba(0,0,0,0.45)',
-    display: 'flex',
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    zIndex: 100,
-    padding: 16,
-  },
-  modal: {
-    background: '#fff',
-    borderRadius: '16px 16px 0 0',
-    padding: 28,
-    width: '100%',
-    maxWidth: 480,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 16,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 700,
-    margin: 0,
-    color: TEXT_MAIN,
-  },
-  modalBody: {
-    fontSize: 16,
-    color: TEXT_SUB,
-    lineHeight: 1.6,
-    margin: 0,
-  },
-  modalBtns: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 10,
-  },
-  confirmText: {
-    fontSize: 15,
-    color: DANGER,
-    margin: 0,
-    padding: '8px 0',
-  },
-};

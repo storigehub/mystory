@@ -19,6 +19,7 @@ export interface Photo {
   id: string;
   data: string; // base64 data url
   caption?: string;
+  isFeatured?: boolean; // 대표사진: 챕터 섹션 헤더 배경으로 사용
 }
 
 export interface Message {
@@ -94,6 +95,7 @@ interface BookContextType {
   addPhoto: (chapterIdx: number, photo: Photo) => void;
   removePhoto: (chapterIdx: number, photoId: string) => void;
   updatePhotoCaption: (chapterIdx: number, photoId: string, caption: string) => void;
+  setPhotoFeatured: (chapterIdx: number, photoId: string, featured: boolean) => void;
   setChapterMode: (chapterIdx: number, mode: 'chat' | 'normal') => void;
   markChapterDone: (chapterIdx: number) => void;
 
@@ -507,6 +509,24 @@ export function BookProvider({ children }: { children: ReactNode }) {
                 ...ch,
                 photos: ch.photos.map((p) =>
                   p.id === photoId ? { ...p, caption } : p
+                ),
+              }
+            : ch
+        );
+        return { ...prev, chapters };
+      }),
+
+    setPhotoFeatured: (chapterIdx, photoId, featured) =>
+      updateState((prev) => {
+        const chapters = prev.chapters.map((ch, i) =>
+          i === chapterIdx
+            ? {
+                ...ch,
+                // 대표사진은 챕터당 하나만 가능: 다른 사진 해제 후 선택
+                photos: ch.photos.map((p) =>
+                  p.id === photoId
+                    ? { ...p, isFeatured: featured }
+                    : { ...p, isFeatured: false }
                 ),
               }
             : ch
