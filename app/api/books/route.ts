@@ -18,7 +18,7 @@ export async function GET() {
     const supabase = createServerClient();
     const { data, error } = await supabase
       .from('books')
-      .select('id, title, author, created_at, updated_at, chapters(count)')
+      .select('id, title, author, created_at, updated_at, is_public, share_token, chapters(count)')
       .eq('user_id', userId)
       .order('updated_at', { ascending: false });
 
@@ -33,6 +33,8 @@ export async function GET() {
       author: book.author,
       created_at: book.created_at,
       updated_at: book.updated_at,
+      is_public: (book as any).is_public ?? false,
+      share_token: (book as any).share_token ?? null,
       chapter_count: (book.chapters as unknown as { count: number }[])?.[0]?.count ?? 0,
     }));
 

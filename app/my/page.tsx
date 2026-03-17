@@ -14,6 +14,8 @@ interface BookSummary {
   created_at: string;
   updated_at: string;
   chapter_count: number;
+  is_public: boolean;
+  share_token: string | null;
 }
 
 interface ChapterSummary {
@@ -72,6 +74,17 @@ export default function MyPage() {
   const [deleteTarget, setDeleteTarget] = useState<BookSummary | null>(null);
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  const [copiedBookId, setCopiedBookId] = useState<string | null>(null);
+
+  const copyBookLink = (book: BookSummary) => {
+    const base = `${window.location.origin}/shared/${book.id}`;
+    const url = book.share_token ? `${base}?token=${book.share_token}` : base;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedBookId(book.id);
+      setTimeout(() => setCopiedBookId(null), 2000);
+    });
+  };
 
   /* ── 비로그인 리다이렉트 ── */
   useEffect(() => {
@@ -372,8 +385,8 @@ export default function MyPage() {
                         {book.author || '저자 미상'} · {formatDate(book.updated_at)} 수정
                       </p>
 
-                      {/* 챕터 통계 */}
-                      <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
+                      {/* 챕터 통계 + 공유 상태 */}
+                      <div style={{ display: 'flex', gap: 8, marginTop: 2, flexWrap: 'wrap' }}>
                         <span style={{
                           fontSize: 11, color: TOKENS.accent, fontFamily: TOKENS.sans,
                           background: '#fbf7f0', borderRadius: 20, padding: '3px 10px',
@@ -381,6 +394,16 @@ export default function MyPage() {
                         }}>
                           {book.chapter_count}개 챕터
                         </span>
+                        {book.is_public && (
+                          <span style={{ fontSize: 11, fontFamily: TOKENS.sans, background: '#F0FDF4', color: '#16A34A', borderRadius: 20, padding: '3px 10px', border: '1px solid #BBF7D0' }}>
+                            공개
+                          </span>
+                        )}
+                        {book.share_token && (
+                          <span style={{ fontSize: 11, fontFamily: TOKENS.sans, background: '#EFF6FF', color: '#1D4ED8', borderRadius: 20, padding: '3px 10px', border: '1px solid #BFDBFE' }}>
+                            가족 공유
+                          </span>
+                        )}
                       </div>
 
                       {/* 액션 버튼 */}
@@ -407,6 +430,21 @@ export default function MyPage() {
                         >
                           목차 {isExpanded ? '▲' : '▼'}
                         </button>
+                        {(book.is_public || book.share_token) && (
+                          <button
+                            onClick={() => copyBookLink(book)}
+                            style={{
+                              background: copiedBookId === book.id ? '#EFF6FF' : 'transparent',
+                              color: copiedBookId === book.id ? '#1D4ED8' : TOKENS.subtext,
+                              border: `1px solid ${copiedBookId === book.id ? '#BFDBFE' : TOKENS.border}`,
+                              borderRadius: TOKENS.radiusSm,
+                              padding: '8px 14px', fontSize: 13, fontFamily: TOKENS.sans,
+                              cursor: 'pointer', minHeight: 36, transition: 'all 0.15s',
+                            }}
+                          >
+                            {copiedBookId === book.id ? '복사됨' : '링크 복사'}
+                          </button>
+                        )}
                         <button
                           onClick={() => { setDeleteTarget(book); setDeleteConfirmed(false); }}
                           style={{

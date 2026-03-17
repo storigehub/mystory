@@ -4,11 +4,14 @@ import { createServerClient } from '@/lib/supabase';
 type Params = { params: { id: string } };
 
 /**
- * GET /api/shared/[id]
- * 공개된 책을 인증 없이 조회 — is_public = true 인 경우만 반환
+ * GET /api/shared/[id]?token=xxx
+ * 공개 책 조회 (인증 없음)
+ * - is_public = true → 누구나 접근
+ * - share_token 일치 → 가족 링크로 접근 (비공개여도 허용)
  */
-export async function GET(_req: NextRequest, { params }: Params) {
+export async function GET(req: NextRequest, { params }: Params) {
   try {
+    const token = req.nextUrl.searchParams.get('token');
     const supabase = createServerClient();
 
     const { data: book, error: bookErr } = await supabase
@@ -21,7 +24,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: '책을 찾을 수 없습니다' }, { status: 404 });
     }
 
-    if (!book.is_public) {
+    // 접근 허용 조건: 공개이거나 토큰 일치
+    const tokenMatch = token && book.share_token && token === book.share_token;
+    if (!book.is_public && !tokenMatch) {
       return NextResponse.json({ error: '비공개 책입니다' }, { status: 403 });
     }
 

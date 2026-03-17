@@ -89,14 +89,22 @@ export default function BookPage() {
   const [shareLoading, setShareLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  /* 가족 링크 */
+  const [shareToken, setShareToken] = useState<string | null>(null);
+  const [familyLoading, setFamilyLoading] = useState(false);
+  const [familyCopied, setFamilyCopied] = useState(false);
+
   const chapterRefs = useRef<Record<string, HTMLElement | null>>({});
 
-  /* is_public 초기값 로드 */
+  /* is_public + share_token 초기값 로드 */
   useEffect(() => {
     if (!state.bookId) return;
     fetch(`/api/books/${state.bookId}`)
       .then((r) => r.json())
-      .then((data) => { if (data.book?.is_public) setIsPublic(true); })
+      .then((data) => {
+        if (data.book?.is_public) setIsPublic(true);
+        if (data.book?.share_token) setShareToken(data.book.share_token);
+      })
       .catch(() => {});
   }, [state.bookId]);
 
@@ -120,6 +128,36 @@ export default function BookPage() {
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const generateFamilyLink = async () => {
+    if (!state.bookId) return;
+    setFamilyLoading(true);
+    try {
+      const res = await fetch(`/api/books/${state.bookId}/share`, { method: 'POST' });
+      const data = await res.json();
+      if (data.token) setShareToken(data.token);
+    } catch { /* ignore */ }
+    finally { setFamilyLoading(false); }
+  };
+
+  const revokeFamilyLink = async () => {
+    if (!state.bookId) return;
+    setFamilyLoading(true);
+    try {
+      await fetch(`/api/books/${state.bookId}/share`, { method: 'DELETE' });
+      setShareToken(null);
+    } catch { /* ignore */ }
+    finally { setFamilyLoading(false); }
+  };
+
+  const copyFamilyUrl = () => {
+    if (!shareToken) return;
+    const url = `${window.location.origin}/shared/${state.bookId}?token=${shareToken}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setFamilyCopied(true);
+      setTimeout(() => setFamilyCopied(false), 2000);
     });
   };
 
@@ -289,6 +327,56 @@ export default function BookPage() {
             </button>
           ))}
         </div>
+
+        {/* 가족 공유 링크 */}
+        {state.bookId && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            {!shareToken ? (
+              <button
+                onClick={generateFamilyLink}
+                disabled={familyLoading}
+                title="가족에게만 보이는 비공개 링크 생성"
+                style={{
+                  padding: '6px 11px', borderRadius: TOKENS.radiusSm,
+                  border: `1px solid ${TOKENS.border}`, background: TOKENS.bg,
+                  color: TOKENS.muted, fontSize: 11, fontFamily: TOKENS.sans,
+                  cursor: 'pointer', minHeight: 32, whiteSpace: 'nowrap',
+                }}
+              >
+                {familyLoading ? '…' : '가족 링크'}
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={copyFamilyUrl}
+                  style={{
+                    padding: '6px 10px', borderRadius: TOKENS.radiusSm,
+                    border: `1px solid ${familyCopied ? '#93C5FD' : TOKENS.border}`,
+                    background: familyCopied ? '#EFF6FF' : TOKENS.bg,
+                    color: familyCopied ? '#1D4ED8' : TOKENS.subtext,
+                    fontSize: 11, fontFamily: TOKENS.sans, cursor: 'pointer',
+                    minHeight: 32, transition: 'all 0.15s', whiteSpace: 'nowrap',
+                  }}
+                >
+                  {familyCopied ? '복사됨' : '가족 링크 복사'}
+                </button>
+                <button
+                  onClick={revokeFamilyLink}
+                  disabled={familyLoading}
+                  title="가족 링크 해제"
+                  style={{
+                    padding: '6px 8px', borderRadius: TOKENS.radiusSm,
+                    border: `1px solid ${TOKENS.border}`, background: TOKENS.bg,
+                    color: TOKENS.muted, fontSize: 11, fontFamily: TOKENS.sans,
+                    cursor: 'pointer', minHeight: 32,
+                  }}
+                >
+                  ✕
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
         <button onClick={handleQuickPrint} style={{
           background: 'transparent', color: TOKENS.subtext,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { TOKENS, FONT_SIZE_PRESETS } from '@/lib/design-tokens';
 
 const COVER_TEMPLATES = [
@@ -40,7 +40,9 @@ function getChapterPhotos(ch: Chapter) {
 
 export default function SharedBookPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const bookId = params.id as string;
+  const token = searchParams.get('token');
 
   const [book, setBook] = useState<Book | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -53,7 +55,8 @@ export default function SharedBookPage() {
   const fontPreset = FONT_SIZE_PRESETS['normal'];
 
   useEffect(() => {
-    fetch(`/api/shared/${bookId}`)
+    const url = token ? `/api/shared/${bookId}?token=${token}` : `/api/shared/${bookId}`;
+    fetch(url)
       .then((r) => r.json())
       .then((data) => {
         if (data.error) { setError(data.error); return; }
@@ -62,7 +65,7 @@ export default function SharedBookPage() {
       })
       .catch(() => setError('불러오는 중 오류가 발생했습니다'))
       .finally(() => setLoading(false));
-  }, [bookId]);
+  }, [bookId, token]);
 
   const writtenChapters = chapters.filter(
     (c) => getChapterText(c).length > 0 || getChapterPhotos(c).length > 0
