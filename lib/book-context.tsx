@@ -27,6 +27,7 @@ export interface Message {
   type: 'user' | 'assistant' | 'photo';
   text: string; // photo type → base64 data url
   timestamp?: number;
+  source?: 'ai' | 'interviewer'; // 질문 출처: AI vs 인터뷰어
 }
 
 export interface Chapter {
@@ -387,7 +388,8 @@ export function BookProvider({ children }: { children: ReactNode }) {
             .sort((a: any, b: any) => a.sort_order - b.sort_order)
             .map((m: any) => ({
               id: Math.random().toString(36).slice(2, 10),
-              type: (m.type === 'ai' ? 'assistant' : m.type) as 'user' | 'assistant' | 'photo',
+              type: (m.type === 'ai' || m.type === 'interviewer' ? 'assistant' : m.type) as 'user' | 'assistant' | 'photo',
+              source: m.type === 'interviewer' ? 'interviewer' : m.type === 'ai' ? 'ai' : undefined,
               text: m.text || m.photo_url || '',
               timestamp: Date.now(),
             })),

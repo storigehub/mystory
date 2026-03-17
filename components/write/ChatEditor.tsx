@@ -22,6 +22,15 @@ function AIIcon() {
   );
 }
 
+function PersonIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function SendIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -443,31 +452,35 @@ export default function ChatEditor({ chapter, chapterIdx }: ChatEditorProps) {
               <div style={{ display: 'flex', gap: 8, maxWidth: '85%' }}>
                 <div
                   style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: '50%',
-                    background: TOKENS.dark,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                    color: '#fff',
+                    width: 32, height: 32, borderRadius: '50%',
+                    background: msg.source === 'interviewer' ? '#7C3AED' : TOKENS.dark,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0, color: '#fff',
+                    title: msg.source === 'interviewer' ? '인터뷰어 질문' : 'AI 질문',
                   }}
                 >
-                  <AIIcon />
+                  {msg.source === 'interviewer' ? <PersonIcon /> : <AIIcon />}
                 </div>
-                <div
-                  style={{
-                    background: TOKENS.card,
-                    borderRadius: '3px 16px 16px 16px',
-                    padding: '12px 14px',
-                    fontSize: fontPreset.chat,
-                    lineHeight: 1.8,
-                    boxShadow: TOKENS.shadowSm,
-                    whiteSpace: 'pre-wrap',
-                  }}
-                >
-                  {msg.text}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {msg.source === 'interviewer' && (
+                    <span style={{ fontSize: 10, color: '#7C3AED', fontFamily: TOKENS.sans, letterSpacing: 1 }}>
+                      인터뷰어
+                    </span>
+                  )}
+                  <div
+                    style={{
+                      background: msg.source === 'interviewer' ? '#F5F3FF' : TOKENS.card,
+                      borderRadius: '3px 16px 16px 16px',
+                      padding: '12px 14px',
+                      fontSize: fontPreset.chat,
+                      lineHeight: 1.8,
+                      boxShadow: TOKENS.shadowSm,
+                      whiteSpace: 'pre-wrap',
+                      border: msg.source === 'interviewer' ? '1px solid #DDD6FE' : 'none',
+                    }}
+                  >
+                    {msg.text}
+                  </div>
                 </div>
               </div>
             )}

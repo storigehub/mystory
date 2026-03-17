@@ -139,7 +139,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
         const msgRows = ch.messages.map((m, idx) => ({
           chapter_id: dbChapterId!,
-          type: m.type === 'assistant' ? 'ai' : m.type,
+          type: m.type === 'assistant' ? (m.source === 'interviewer' ? 'interviewer' : 'ai') : m.type,
           text: m.text,
           sort_order: idx,
         }));

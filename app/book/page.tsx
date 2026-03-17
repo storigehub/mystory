@@ -161,6 +161,16 @@ export default function BookPage() {
     });
   };
 
+  const [interviewerCopied, setInterviewerCopied] = useState(false);
+  const copyInterviewerUrl = () => {
+    if (!shareToken) return;
+    const url = `${window.location.origin}/interviewer/${state.bookId}?token=${shareToken}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setInterviewerCopied(true);
+      setTimeout(() => setInterviewerCopied(false), 2000);
+    });
+  };
+
   const coverTemplate = COVER_TEMPLATES.find((t) => t.id === state.coverTemplateId) ?? COVER_TEMPLATES[0];
   const fontPreset = FONT_SIZE_PRESETS[state.fontSize];
   const writtenChapters = state.chapters.filter(
@@ -358,7 +368,21 @@ export default function BookPage() {
                     minHeight: 32, transition: 'all 0.15s', whiteSpace: 'nowrap',
                   }}
                 >
-                  {familyCopied ? '복사됨' : '가족 링크 복사'}
+                  {familyCopied ? '복사됨' : '가족 링크'}
+                </button>
+                <button
+                  onClick={copyInterviewerUrl}
+                  title="가족이 직접 질문할 수 있는 인터뷰어 링크 복사"
+                  style={{
+                    padding: '6px 10px', borderRadius: TOKENS.radiusSm,
+                    border: `1px solid ${interviewerCopied ? '#DDD6FE' : TOKENS.border}`,
+                    background: interviewerCopied ? '#F5F3FF' : TOKENS.bg,
+                    color: interviewerCopied ? '#7C3AED' : TOKENS.subtext,
+                    fontSize: 11, fontFamily: TOKENS.sans, cursor: 'pointer',
+                    minHeight: 32, transition: 'all 0.15s', whiteSpace: 'nowrap',
+                  }}
+                >
+                  {interviewerCopied ? '복사됨' : '인터뷰어'}
                 </button>
                 <button
                   onClick={revokeFamilyLink}
