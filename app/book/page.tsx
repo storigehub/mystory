@@ -84,7 +84,44 @@ export default function BookPage() {
   const [tocOpen, setTocOpen] = useState(false);
   const [activeChapterIdx, setActiveChapterIdx] = useState(0);
 
+  /* 공유 */
+  const [isPublic, setIsPublic] = useState(false);
+  const [shareLoading, setShareLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
   const chapterRefs = useRef<Record<string, HTMLElement | null>>({});
+
+  /* is_public 초기값 로드 */
+  useEffect(() => {
+    if (!state.bookId) return;
+    fetch(`/api/books/${state.bookId}`)
+      .then((r) => r.json())
+      .then((data) => { if (data.book?.is_public) setIsPublic(true); })
+      .catch(() => {});
+  }, [state.bookId]);
+
+  const togglePublic = async () => {
+    if (!state.bookId) return;
+    const next = !isPublic;
+    setShareLoading(true);
+    try {
+      const res = await fetch(`/api/books/${state.bookId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_public: next }),
+      });
+      if (res.ok) setIsPublic(next);
+    } catch { /* ignore */ }
+    finally { setShareLoading(false); }
+  };
+
+  const copyShareUrl = () => {
+    const url = `${window.location.origin}/shared/${state.bookId}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   const coverTemplate = COVER_TEMPLATES.find((t) => t.id === state.coverTemplateId) ?? COVER_TEMPLATES[0];
   const fontPreset = FONT_SIZE_PRESETS[state.fontSize];
@@ -186,6 +223,43 @@ export default function BookPage() {
         <span style={{ flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 600, color: TOKENS.text, letterSpacing: '-0.02em' }}>
           {state.title || '나의 이야기'}
         </span>
+
+        {/* 공유 버튼 */}
+        {state.bookId && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <button
+              onClick={togglePublic}
+              disabled={shareLoading}
+              title={isPublic ? '공개 중 — 클릭하면 비공개로 전환' : '클릭하면 공개 URL 생성'}
+              style={{
+                padding: '6px 11px', borderRadius: TOKENS.radiusSm,
+                border: `1px solid ${isPublic ? '#86EFAC' : TOKENS.border}`,
+                background: isPublic ? '#F0FDF4' : TOKENS.bg,
+                color: isPublic ? '#16A34A' : TOKENS.muted,
+                fontSize: 11, fontFamily: TOKENS.sans, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 4, minHeight: 32,
+                transition: 'all 0.15s',
+              }}
+            >
+              {isPublic ? '● 공개' : '○ 공유'}
+            </button>
+            {isPublic && (
+              <button
+                onClick={copyShareUrl}
+                style={{
+                  padding: '6px 10px', borderRadius: TOKENS.radiusSm,
+                  border: `1px solid ${copied ? '#86EFAC' : TOKENS.border}`,
+                  background: copied ? '#F0FDF4' : TOKENS.bg,
+                  color: copied ? '#16A34A' : TOKENS.muted,
+                  fontSize: 11, fontFamily: TOKENS.sans, cursor: 'pointer',
+                  minHeight: 32, transition: 'all 0.15s',
+                }}
+              >
+                {copied ? '복사됨' : 'URL 복사'}
+              </button>
+            )}
+          </div>
+        )}
 
         {/* 읽기/미리보기 탭 */}
         <div style={{ display: 'flex', background: TOKENS.warm, borderRadius: 8, padding: 3, gap: 2 }}>

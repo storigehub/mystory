@@ -91,6 +91,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const updates: Record<string, unknown> = {};
     if (body.title !== undefined) updates.title = body.title;
     if (body.author !== undefined) updates.author = body.author;
+    if (body.is_public !== undefined) updates.is_public = Boolean(body.is_public);
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: '업데이트할 내용이 없습니다' }, { status: 400 });
