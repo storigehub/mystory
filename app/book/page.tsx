@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useBook, Chapter, Photo, CoverTemplateId } from '@/lib/book-context';
@@ -80,6 +80,10 @@ export default function BookPage() {
   const [selectedSize, setSelectedSize] = useState<PaperSizeId>('A5');
   const [isPrinting, setIsPrinting] = useState(false);
 
+  /* 챕터 네비게이션 */
+  const [tocOpen, setTocOpen] = useState(false);
+  const [activeChapterIdx, setActiveChapterIdx] = useState(0);
+
   const chapterRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const coverTemplate = COVER_TEMPLATES.find((t) => t.id === state.coverTemplateId) ?? COVER_TEMPLATES[0];
@@ -94,10 +98,40 @@ export default function BookPage() {
     setCoverTemplateId(COVER_TEMPLATES[(idx + 1) % COVER_TEMPLATES.length].id);
   };
 
+  /* ── IntersectionObserver: 현재 챕터 감지 ── */
+  useEffect(() => {
+    if (viewMode !== 'read') return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const idx = writtenChapters.findIndex((c) => c.id === entry.target.id);
+            if (idx >= 0) setActiveChapterIdx(idx);
+          }
+        }
+      },
+      { rootMargin: '-30% 0px -60% 0px', threshold: 0 }
+    );
+    Object.values(chapterRefs.current).forEach((el) => el && observer.observe(el));
+    return () => observer.disconnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, writtenChapters.length]);
+
   /* ── 챕터 스크롤 ── */
-  const scrollToChapter = (id: string) => {
+  const scrollToChapter = (id: string, closePanel = false) => {
     chapterRefs.current[id]?.scrollIntoView({ behavior: 'smooth' });
+    if (closePanel) setTocOpen(false);
   };
+
+  const goToPrevChapter = useCallback(() => {
+    if (activeChapterIdx > 0) scrollToChapter(writtenChapters[activeChapterIdx - 1].id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeChapterIdx, writtenChapters]);
+
+  const goToNextChapter = useCallback(() => {
+    if (activeChapterIdx < writtenChapters.length - 1) scrollToChapter(writtenChapters[activeChapterIdx + 1].id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeChapterIdx, writtenChapters]);
 
   /* ── 관리자 인증 ── */
   const handleVerify = async () => {
@@ -268,6 +302,7 @@ export default function BookPage() {
               return (
                 <article
                   key={ch.id}
+                  id={ch.id}
                   ref={(el) => { chapterRefs.current[ch.id] = el; }}
                   style={{ marginBottom: 0 }}
                 >
@@ -360,12 +395,43 @@ export default function BookPage() {
                       </figure>
                     ))}
 
-                    {/* 섹션 구분 */}
-                    {i < writtenChapters.length - 1 && (
-                      <div style={{ textAlign: 'center', padding: '40px 0 0', color: TOKENS.light, letterSpacing: 12, fontSize: 13 }}>
-                        · · ·
-                      </div>
-                    )}
+                    {/* 이전/다음 챕터 네비게이션 */}
+                    <div style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '40px 0 8px', gap: 12,
+                    }}>
+                      <button
+                        onClick={goToPrevChapter}
+                        disabled={i === 0}
+                        style={{
+                          padding: '10px 16px', border: `1px solid ${TOKENS.borderLight}`,
+                          borderRadius: 8, background: i === 0 ? 'transparent' : TOKENS.warm,
+                          color: i === 0 ? TOKENS.light : TOKENS.subtext,
+                          fontSize: 12, fontFamily: TOKENS.sans, cursor: i === 0 ? 'default' : 'pointer',
+                          display: 'flex', alignItems: 'center', gap: 6, minHeight: 40,
+                          opacity: i === 0 ? 0 : 1, pointerEvents: i === 0 ? 'none' : 'auto',
+                        }}
+                      >
+                        ← {writtenChapters[i - 1]?.title}
+                      </button>
+                      <div style={{ color: TOKENS.light, letterSpacing: 10, fontSize: 13 }}>· · ·</div>
+                      <button
+                        onClick={goToNextChapter}
+                        disabled={i === writtenChapters.length - 1}
+                        style={{
+                          padding: '10px 16px', border: `1px solid ${TOKENS.borderLight}`,
+                          borderRadius: 8, background: i === writtenChapters.length - 1 ? 'transparent' : TOKENS.warm,
+                          color: i === writtenChapters.length - 1 ? TOKENS.light : TOKENS.subtext,
+                          fontSize: 12, fontFamily: TOKENS.sans,
+                          cursor: i === writtenChapters.length - 1 ? 'default' : 'pointer',
+                          display: 'flex', alignItems: 'center', gap: 6, minHeight: 40,
+                          opacity: i === writtenChapters.length - 1 ? 0 : 1,
+                          pointerEvents: i === writtenChapters.length - 1 ? 'none' : 'auto',
+                        }}
+                      >
+                        {writtenChapters[i + 1]?.title} →
+                      </button>
+                    </div>
                   </div>
                 </article>
               );
@@ -408,6 +474,84 @@ export default function BookPage() {
               onCoverChange={handleCoverChange}
             />
           </div>
+        </>
+      )}
+
+      {/* ── 플로팅 TOC 버튼 + 패널 (읽기 모드만) ── */}
+      {viewMode === 'read' && writtenChapters.length > 1 && (
+        <>
+          {/* TOC 열기 버튼 */}
+          <button
+            className="no-print"
+            onClick={() => setTocOpen((v) => !v)}
+            title="목차"
+            style={{
+              position: 'fixed', right: 20, bottom: 80, zIndex: 50,
+              width: 44, height: 44, borderRadius: '50%',
+              background: tocOpen ? TOKENS.dark : TOKENS.card,
+              color: tocOpen ? '#FAFAF9' : TOKENS.text,
+              border: `1px solid ${TOKENS.border}`,
+              boxShadow: '0 2px 12px rgba(0,0,0,0.12)',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 16, transition: 'all 0.2s',
+            }}
+          >
+            ≡
+          </button>
+
+          {/* TOC 패널 */}
+          {tocOpen && (
+            <div
+              className="no-print"
+              style={{
+                position: 'fixed', right: 20, bottom: 132, zIndex: 50,
+                background: TOKENS.card, borderRadius: 12, padding: '16px 0',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.14)',
+                border: `1px solid ${TOKENS.borderLight}`,
+                minWidth: 220, maxWidth: 280,
+                maxHeight: '60vh', overflowY: 'auto',
+              }}
+            >
+              <p style={{
+                fontSize: 10, color: TOKENS.muted, letterSpacing: 3,
+                fontFamily: TOKENS.sans, padding: '0 16px 10px',
+                borderBottom: `1px solid ${TOKENS.borderLight}`, margin: 0,
+              }}>
+                목 차
+              </p>
+              {writtenChapters.map((ch, idx) => (
+                <button
+                  key={ch.id}
+                  onClick={() => scrollToChapter(ch.id, true)}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '10px 16px', background: activeChapterIdx === idx ? TOKENS.warm : 'transparent',
+                    border: 'none', cursor: 'pointer', textAlign: 'left',
+                    borderLeft: activeChapterIdx === idx ? `2px solid ${TOKENS.accent}` : '2px solid transparent',
+                    transition: 'background 0.15s',
+                  }}
+                >
+                  <span style={{ fontSize: 10, color: TOKENS.muted, fontFamily: TOKENS.sans, minWidth: 18 }}>
+                    {String(idx + 1).padStart(2, '0')}
+                  </span>
+                  <span style={{
+                    fontSize: 13, fontFamily: TOKENS.serif, color: TOKENS.text,
+                    fontWeight: activeChapterIdx === idx ? 500 : 400, lineHeight: 1.4,
+                  }}>
+                    {ch.title}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* TOC 열릴 때 외부 클릭으로 닫기 */}
+          {tocOpen && (
+            <div
+              onClick={() => setTocOpen(false)}
+              style={{ position: 'fixed', inset: 0, zIndex: 49 }}
+            />
+          )}
         </>
       )}
 
