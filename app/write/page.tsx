@@ -1,19 +1,81 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { useBook } from '@/lib/book-context';
 import { TOKENS, FONT_SIZE_PRESETS } from '@/lib/design-tokens';
 import ChatEditor from '@/components/write/ChatEditor';
 import NormalEditor from '@/components/write/NormalEditor';
+import { createBrowserClient } from '@/lib/supabase';
 
 export default function WritePage() {
   const router = useRouter();
   const { data: session } = useSession();
-  const { state, isSyncing, syncError, setChapterMode, setProse, setCurrentChapterIdx, markChapterDone, setFontSize, syncToDb, resetBook } = useBook();
+  const { state, isSyncing, syncError, setChapterMode, setProse, setCurrentChapterIdx, markChapterDone, setFontSize, syncToDb, resetBook, setSTTMode, addMessage } = useBook();
   const [showSidebar, setShowSidebar] = useState(false);
   const [showFinish, setShowFinish] = useState(false);
+  const [maxDurationSec, setMaxDurationSec] = useState(120);
+  const [interviewerToast, setInterviewerToast] = useState<{ chapterTitle: string; text: string } | null>(null);
+
+  // stale closure 방지용 ref
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
+  const addMessageRef = useRef(addMessage);
+  useEffect(() => { addMessageRef.current = addMessage; }, [addMessage]);
+
+  // 관리자 설정에서 STT 모드 로드
+  useEffect(() => {
+    fetch('/api/settings')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.stt?.mode) setSTTMode(data.stt.mode);
+        if (data.stt?.maxDurationSec) setMaxDurationSec(data.stt.maxDurationSec);
+      })
+      .catch(() => {}); // 실패 시 기본값 유지
+  }, []);
+
+  // ── Supabase Realtime: 인터뷰어 질문 실시간 수신 ──
+  useEffect(() => {
+    if (!state.bookId) return;
+
+    const supabase = createBrowserClient();
+    const channel = supabase
+      .channel(`interviewer-msgs-${state.bookId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: 'type=eq.interviewer' },
+        (payload) => {
+          const msg = payload.new as { id: string; chapter_id: string; text: string; sort_order: number };
+          const chapters = stateRef.current.chapters;
+          const chapterIdx = chapters.findIndex((ch) => ch.dbId === msg.chapter_id);
+          if (chapterIdx === -1) return; // 이 책의 챕터가 아님
+
+          addMessageRef.current(chapterIdx, {
+            id: msg.id,
+            type: 'assistant',
+            source: 'interviewer',
+            text: msg.text,
+            timestamp: Date.now(),
+          });
+
+          // 현재 편집 중인 챕터가 아니면 토스트 알림
+          const currentIdx = stateRef.current.currentChapterIdx;
+          if (chapterIdx !== currentIdx) {
+            setInterviewerToast({
+              chapterTitle: chapters[chapterIdx].title,
+              text: msg.text,
+            });
+            setTimeout(() => setInterviewerToast(null), 5000);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [state.bookId]); // bookId가 바뀔 때만 재구독
 
   const currentChapter = state.chapters[state.currentChapterIdx];
   const doneCount = state.chapters.filter((c) => c.done).length;
@@ -84,6 +146,29 @@ export default function WritePage() {
         background: mode === 'chat' ? TOKENS.warm : TOKENS.bg,
       }}
     >
+      {/* 인터뷰어 질문 도착 토스트 */}
+      {interviewerToast && (
+        <div
+          style={{
+            position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 500, maxWidth: 360, width: 'calc(100% - 32px)',
+            background: '#7C3AED', color: '#fff',
+            borderRadius: 12, padding: '12px 16px',
+            boxShadow: '0 4px 24px rgba(0,0,0,0.18)',
+            display: 'flex', flexDirection: 'column', gap: 4,
+          }}
+        >
+          <div style={{ fontSize: 11, opacity: 0.85, fontFamily: TOKENS.sans }}>
+            인터뷰어 질문 도착 — {interviewerToast.chapterTitle}
+          </div>
+          <div style={{ fontSize: 13, lineHeight: 1.5, fontFamily: TOKENS.serif }}>
+            {interviewerToast.text.length > 60
+              ? interviewerToast.text.slice(0, 60) + '…'
+              : interviewerToast.text}
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div style={{ flexShrink: 0, background: TOKENS.bg, borderBottom: `1px solid ${TOKENS.borderLight}` }}>
         <div style={{ display: 'flex', alignItems: 'center', padding: '8px 10px 2px', gap: 6 }}>
@@ -410,9 +495,9 @@ export default function WritePage() {
       {/* Main editor */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {mode === 'chat' ? (
-          <ChatEditor chapter={currentChapter} chapterIdx={state.currentChapterIdx} />
+          <ChatEditor chapter={currentChapter} chapterIdx={state.currentChapterIdx} maxDurationSec={maxDurationSec} />
         ) : (
-          <NormalEditor chapter={currentChapter} chapterIdx={state.currentChapterIdx} />
+          <NormalEditor chapter={currentChapter} chapterIdx={state.currentChapterIdx} maxDurationSec={maxDurationSec} />
         )}
       </div>
     </div>

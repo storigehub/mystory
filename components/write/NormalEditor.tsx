@@ -69,9 +69,10 @@ function PhotoIcon() {
 interface NormalEditorProps {
   chapter: Chapter;
   chapterIdx: number;
+  maxDurationSec?: number;
 }
 
-export default function NormalEditor({ chapter, chapterIdx }: NormalEditorProps) {
+export default function NormalEditor({ chapter, chapterIdx, maxDurationSec = 120 }: NormalEditorProps) {
   const { state, setProse, addPhoto, removePhoto, updatePhotoCaption, setPhotoFeatured } = useBook();
   const [showGuide, setShowGuide] = useState(!chapter.prose?.length);
   const [isListening, setIsListening] = useState(false);
@@ -198,7 +199,7 @@ export default function NormalEditor({ chapter, chapterIdx }: NormalEditorProps)
     setTimeout(() => growTA(bid), 50);
   }, [setProse]);
 
-  const whisper = useWhisperSTT(state.sttMode === 'whisper', onWhisperTranscribed);
+  const whisper = useWhisperSTT(state.sttMode === 'whisper', onWhisperTranscribed, maxDurationSec);
   const isVoiceActive = isListening || whisper.isRecording || whisper.isTranscribing;
 
   /* ── Browser STT 초기화 ── */

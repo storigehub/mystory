@@ -117,9 +117,10 @@ function TypingIndicator() {
 interface ChatEditorProps {
   chapter: Chapter;
   chapterIdx: number;
+  maxDurationSec?: number;
 }
 
-export default function ChatEditor({ chapter, chapterIdx }: ChatEditorProps) {
+export default function ChatEditor({ chapter, chapterIdx, maxDurationSec = 120 }: ChatEditorProps) {
   const { state, addMessage, setProse, setChapterMode, markChapterDone } = useBook();
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -154,7 +155,7 @@ export default function ChatEditor({ chapter, chapterIdx }: ChatEditorProps) {
     [autoSendEnabled]
   );
 
-  const whisper = useWhisperSTT(state.sttMode === 'whisper', onWhisperTranscribed);
+  const whisper = useWhisperSTT(state.sttMode === 'whisper', onWhisperTranscribed, maxDurationSec);
 
   // 복합 활성 상태 (UI용)
   const isVoiceActive = isListening || whisper.isRecording || whisper.isTranscribing;
@@ -451,12 +452,12 @@ export default function ChatEditor({ chapter, chapterIdx }: ChatEditorProps) {
             {msg.type === 'assistant' && (
               <div style={{ display: 'flex', gap: 8, maxWidth: '85%' }}>
                 <div
+                  title={msg.source === 'interviewer' ? '인터뷰어 질문' : 'AI 질문'}
                   style={{
                     width: 32, height: 32, borderRadius: '50%',
                     background: msg.source === 'interviewer' ? '#7C3AED' : TOKENS.dark,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     flexShrink: 0, color: '#fff',
-                    title: msg.source === 'interviewer' ? '인터뷰어 질문' : 'AI 질문',
                   }}
                 >
                   {msg.source === 'interviewer' ? <PersonIcon /> : <AIIcon />}

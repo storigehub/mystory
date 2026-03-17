@@ -15,12 +15,14 @@ interface UseWhisperSTTResult {
 }
 
 /**
- * @param enabled   state.sttMode === 'whisper' 일 때 true
+ * @param enabled        state.sttMode === 'whisper' 일 때 true
  * @param onTranscribed  전사 완료 시 호출되는 콜백 (text: string) => void
+ * @param maxDurationSec 최대 녹음 시간(초). 초과 시 자동 중지. 기본값 120
  */
 export function useWhisperSTT(
   enabled: boolean,
-  onTranscribed: (text: string) => void
+  onTranscribed: (text: string) => void,
+  maxDurationSec = 120
 ): UseWhisperSTTResult {
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -29,6 +31,7 @@ export function useWhisperSTT(
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const maxDurationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 콜백을 ref로 보관해 stale closure 방지
   const onTranscribedRef = useRef(onTranscribed);
@@ -100,6 +103,16 @@ export function useWhisperSTT(
       mediaRecorderRef.current = mr;
       mr.start(1000); // 1초마다 청크 수집
       setIsRecording(true);
+
+      // 최대 녹음 시간 초과 시 자동 중지
+      if (maxDurationSec > 0) {
+        maxDurationTimerRef.current = setTimeout(() => {
+          if (mediaRecorderRef.current?.state === 'recording') {
+            try { mediaRecorderRef.current.stop(); } catch {}
+            setIsRecording(false);
+          }
+        }, maxDurationSec * 1000);
+      }
     } catch (err: any) {
       console.error('마이크 접근 실패:', err);
       setError('마이크 접근이 거부되었습니다. 브라우저 설정을 확인해주세요.');
@@ -108,6 +121,10 @@ export function useWhisperSTT(
 
   const stopRecording = useCallback(() => {
     if (!isRecording || !mediaRecorderRef.current) return;
+    if (maxDurationTimerRef.current) {
+      clearTimeout(maxDurationTimerRef.current);
+      maxDurationTimerRef.current = null;
+    }
     try {
       mediaRecorderRef.current.stop();
     } catch {}
@@ -122,6 +139,7 @@ export function useWhisperSTT(
   // 컴포넌트 언마운트 시 정리
   useEffect(() => {
     return () => {
+      if (maxDurationTimerRef.current) clearTimeout(maxDurationTimerRef.current);
       try { mediaRecorderRef.current?.stop(); } catch {}
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
