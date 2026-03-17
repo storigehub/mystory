@@ -202,6 +202,18 @@ export default function BookPage() {
   const closeModal = () => { setShowModal(false); setModalStep(1); setAdminPw(''); setAdminError(''); };
   const openModal  = () => { setModalStep(1); setAdminPw(''); setAdminError(''); setShowModal(true); };
 
+  /* ── 일반 PDF 저장 (A5 고정, 비밀번호 없음) ── */
+  const handleQuickPrint = () => {
+    const styleEl = document.createElement('style');
+    styleEl.id = 'print-size-override';
+    styleEl.textContent = `@media print { @page { size: A5 portrait; } }`;
+    document.head.appendChild(styleEl);
+    setTimeout(() => {
+      window.print();
+      document.getElementById('print-size-override')?.remove();
+    }, 200);
+  };
+
   return (
     <div style={{ minHeight: '100dvh', background: '#fff', fontFamily: TOKENS.serif }}>
 
@@ -277,6 +289,15 @@ export default function BookPage() {
             </button>
           ))}
         </div>
+
+        <button onClick={handleQuickPrint} style={{
+          background: 'transparent', color: TOKENS.subtext,
+          border: `1px solid ${TOKENS.border}`,
+          borderRadius: TOKENS.radiusSm, fontSize: 12, fontFamily: TOKENS.sans,
+          cursor: 'pointer', padding: '7px 12px', minHeight: 36, whiteSpace: 'nowrap',
+        }}>
+          PDF 저장
+        </button>
 
         <button onClick={openModal} style={{
           background: TOKENS.dark, color: '#FAFAF9', border: 'none',
