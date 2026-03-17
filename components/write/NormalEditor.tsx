@@ -150,18 +150,31 @@ export default function NormalEditor({ chapter, chapterIdx }: NormalEditorProps)
     });
   }, [removePhoto, setProse]);
 
-  /* ── 파일 선택 ── */
-  const onFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  /* ── 파일 선택 → Cloudinary 업로드 ── */
+  const [isUploading, setIsUploading] = useState(false);
+
+  const onFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const photoId = uid();
-      addPhoto(chapterIdxRef.current, { id: photoId, data: ev.target?.result as string, caption: '' });
-      insertPhotoAfterBlock(activeBidRef.current, photoId);
-    };
-    reader.readAsDataURL(file);
     e.target.value = '';
+
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload/photo', { method: 'POST', body: formData });
+      const json = await res.json();
+      if (!res.ok || !json.url) throw new Error(json.error || '업로드 실패');
+
+      const photoId = uid();
+      addPhoto(chapterIdxRef.current, { id: photoId, data: json.url, caption: '' });
+      insertPhotoAfterBlock(activeBidRef.current, photoId);
+    } catch (err) {
+      console.error('Photo upload failed:', err);
+      alert('사진 업로드에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleAddPhoto = (bid: string) => {
@@ -276,8 +289,8 @@ export default function NormalEditor({ chapter, chapterIdx }: NormalEditorProps)
       {/* ── Toolbar ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: TOKENS.bg, borderBottom: `1px solid ${TOKENS.borderLight}`, flexShrink: 0 }}>
         <input ref={fileRef} type="file" accept="image/*" onChange={onFileSelect} style={{ display: 'none' }} />
-        <button onClick={() => handleAddPhoto(activeBidRef.current)} style={toolBtn()}>
-          <PhotoIcon /><span>사진</span>
+        <button onClick={() => handleAddPhoto(activeBidRef.current)} disabled={isUploading} style={toolBtn(isUploading)}>
+          <PhotoIcon /><span>{isUploading ? '업로드 중...' : '사진'}</span>
         </button>
         {state.sttMode !== 'off' && (
           <button onClick={toggleVoice} disabled={whisper.isTranscribing} style={toolBtn(isVoiceActive)}>
