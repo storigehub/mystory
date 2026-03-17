@@ -94,6 +94,13 @@ export default function BookPage() {
   const [familyLoading, setFamilyLoading] = useState(false);
   const [familyCopied, setFamilyCopied] = useState(false);
 
+  /* 이메일 초대 */
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteType, setInviteType] = useState<'reader' | 'interviewer'>('reader');
+  const [inviteSending, setInviteSending] = useState(false);
+  const [inviteResult, setInviteResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
   const chapterRefs = useRef<Record<string, HTMLElement | null>>({});
 
   /* is_public + share_token 초기값 로드 */
@@ -159,6 +166,30 @@ export default function BookPage() {
       setFamilyCopied(true);
       setTimeout(() => setFamilyCopied(false), 2000);
     });
+  };
+
+  const sendInviteEmail = async () => {
+    if (!inviteEmail || !shareToken || !state.bookId) return;
+    setInviteSending(true);
+    setInviteResult(null);
+    try {
+      const res = await fetch(`/api/books/${state.bookId}/invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: inviteEmail, type: inviteType, token: shareToken }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setInviteResult({ ok: true, msg: `${inviteEmail}로 초대장을 보냈습니다` });
+        setInviteEmail('');
+      } else {
+        setInviteResult({ ok: false, msg: data.error || '발송 실패' });
+      }
+    } catch {
+      setInviteResult({ ok: false, msg: '네트워크 오류가 발생했습니다' });
+    } finally {
+      setInviteSending(false);
+    }
   };
 
   const [interviewerCopied, setInterviewerCopied] = useState(false);
@@ -383,6 +414,18 @@ export default function BookPage() {
                   }}
                 >
                   {interviewerCopied ? '복사됨' : '인터뷰어'}
+                </button>
+                <button
+                  onClick={() => { setInviteResult(null); setShowInviteModal(true); }}
+                  title="이메일로 초대장 발송"
+                  style={{
+                    padding: '6px 10px', borderRadius: TOKENS.radiusSm,
+                    border: `1px solid ${TOKENS.border}`, background: TOKENS.bg,
+                    color: TOKENS.subtext, fontSize: 11, fontFamily: TOKENS.sans,
+                    cursor: 'pointer', minHeight: 32, whiteSpace: 'nowrap',
+                  }}
+                >
+                  ✉ 초대
                 </button>
                 <button
                   onClick={revokeFamilyLink}
@@ -770,6 +813,100 @@ export default function BookPage() {
         coverGradient={coverTemplate.gradient}
         coverTextColor={coverTemplate.textColor}
       />
+
+      {/* ── 이메일 초대 모달 ── */}
+      {showInviteModal && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowInviteModal(false); }}
+        >
+          <div style={{ background: TOKENS.card, borderRadius: 14, padding: '28px 24px', width: '100%', maxWidth: 380, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            <p style={{ fontSize: 11, color: TOKENS.muted, fontFamily: TOKENS.sans, letterSpacing: 3, marginBottom: 8 }}>가족 초대</p>
+            <h3 style={{ fontSize: 17, fontWeight: 500, marginBottom: 4, color: TOKENS.text }}>이메일로 초대장 보내기</h3>
+            <p style={{ fontSize: 13, color: TOKENS.muted, marginBottom: 20, fontFamily: TOKENS.sans, lineHeight: 1.6 }}>
+              가족에게 이메일로 초대장을 보냅니다.<br />수신자는 링크를 통해 바로 접근할 수 있습니다.
+            </p>
+
+            {/* 초대 유형 */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              {([
+                { value: 'reader', label: '열람', desc: '읽기만 가능' },
+                { value: 'interviewer', label: '인터뷰어', desc: '질문 추가 가능' },
+              ] as const).map(({ value, label, desc }) => (
+                <button
+                  key={value}
+                  onClick={() => setInviteType(value)}
+                  style={{
+                    flex: 1, padding: '10px 12px',
+                    border: `1.5px solid ${inviteType === value ? (value === 'interviewer' ? '#7C3AED' : TOKENS.accent) : TOKENS.border}`,
+                    borderRadius: TOKENS.radiusSm,
+                    background: inviteType === value ? (value === 'interviewer' ? '#F5F3FF' : TOKENS.warm) : TOKENS.card,
+                    cursor: 'pointer', textAlign: 'left',
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontFamily: TOKENS.sans, fontWeight: 600, color: inviteType === value ? (value === 'interviewer' ? '#7C3AED' : TOKENS.accent) : TOKENS.text }}>
+                    {label}
+                  </div>
+                  <div style={{ fontSize: 11, fontFamily: TOKENS.sans, color: TOKENS.muted, marginTop: 2 }}>{desc}</div>
+                </button>
+              ))}
+            </div>
+
+            {/* 이메일 입력 */}
+            <label style={{ fontSize: 11, color: TOKENS.muted, fontFamily: TOKENS.sans, letterSpacing: 2, display: 'block', marginBottom: 6 }}>
+              받는 사람 이메일
+            </label>
+            <input
+              type="email"
+              value={inviteEmail}
+              onChange={(e) => { setInviteEmail(e.target.value); setInviteResult(null); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') sendInviteEmail(); }}
+              placeholder="family@example.com"
+              autoFocus
+              style={{
+                width: '100%', padding: '12px 14px', boxSizing: 'border-box',
+                border: `1px solid ${TOKENS.border}`, borderRadius: TOKENS.radiusSm,
+                fontSize: 15, fontFamily: TOKENS.sans, outline: 'none',
+                background: TOKENS.bg, color: TOKENS.text, marginBottom: 12,
+              }}
+            />
+
+            {/* 결과 메시지 */}
+            {inviteResult && (
+              <p style={{
+                fontSize: 13, fontFamily: TOKENS.sans, marginBottom: 12,
+                color: inviteResult.ok ? '#16a34a' : '#c0392b',
+                padding: '10px 12px', borderRadius: TOKENS.radiusSm,
+                background: inviteResult.ok ? '#F0FDF4' : '#FEF2F2',
+              }}>
+                {inviteResult.ok ? '✓ ' : '✗ '}{inviteResult.msg}
+              </p>
+            )}
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => { setShowInviteModal(false); setInviteEmail(''); setInviteResult(null); }}
+                style={{ flex: 1, padding: '12px 0', background: 'transparent', border: `1px solid ${TOKENS.border}`, borderRadius: TOKENS.radiusSm, fontSize: 14, fontFamily: TOKENS.sans, cursor: 'pointer', color: TOKENS.muted, minHeight: 48 }}
+              >
+                닫기
+              </button>
+              <button
+                onClick={sendInviteEmail}
+                disabled={inviteSending || !inviteEmail}
+                style={{
+                  flex: 2, padding: '12px 0',
+                  background: inviteSending || !inviteEmail ? '#D6D3D1' : TOKENS.dark,
+                  color: '#FAFAF9', border: 'none', borderRadius: TOKENS.radiusSm,
+                  fontSize: 14, fontFamily: TOKENS.sans, fontWeight: 500,
+                  cursor: inviteSending || !inviteEmail ? 'not-allowed' : 'pointer', minHeight: 48,
+                }}
+              >
+                {inviteSending ? '발송 중…' : '✉ 초대장 보내기'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── 관리자 출판 모달 ── */}
       {showModal && (
