@@ -34,16 +34,18 @@ function formatDate(iso: string): string {
   if (diff === 0) return '오늘';
   if (diff === 1) return '어제';
   if (diff < 7) return `${diff}일 전`;
+  if (diff < 30) return `${Math.floor(diff / 7)}주 전`;
   return `${d.getMonth() + 1}월 ${d.getDate()}일`;
 }
 
-/* ─── 책 표지 미니 썸네일 (CSS gradient) ─── */
+/* ─── 책 표지 그라디언트 ─── */
 const COVER_GRADIENTS = [
-  `linear-gradient(160deg, #3D3530, #2C2824)`,
-  `linear-gradient(160deg, #1a2a4a, #0d1b2e)`,
-  `linear-gradient(160deg, #704214, #9B6A2F)`,
-  `linear-gradient(160deg, #4a3728, #2c1f16)`,
-  `linear-gradient(160deg, #2d4a3e, #1a2d26)`,
+  `linear-gradient(160deg, #3D3530 0%, #2C2824 100%)`,
+  `linear-gradient(160deg, #1E2D4A 0%, #0d1b2e 100%)`,
+  `linear-gradient(160deg, #704214 0%, #9B6A2F 100%)`,
+  `linear-gradient(160deg, #3a2e28 0%, #1e1710 100%)`,
+  `linear-gradient(160deg, #2d4a3e 0%, #1a2d26 100%)`,
+  `linear-gradient(160deg, #3a2840 0%, #1e1228 100%)`,
 ];
 
 function coverGradient(title: string) {
@@ -51,6 +53,8 @@ function coverGradient(title: string) {
   for (let i = 0; i < title.length; i++) hash = (hash * 31 + title.charCodeAt(i)) & 0xffff;
   return COVER_GRADIENTS[hash % COVER_GRADIENTS.length];
 }
+
+type SortKey = 'updated' | 'created' | 'title';
 
 /* ─── 메인 컴포넌트 ─── */
 export default function MyPage() {
@@ -66,6 +70,7 @@ export default function MyPage() {
 
   const [books, setBooks] = useState<BookSummary[]>([]);
   const [booksLoading, setBooksLoading] = useState(true);
+  const [sortKey, setSortKey] = useState<SortKey>('updated');
 
   const [expandedBook, setExpandedBook] = useState<string | null>(null);
   const [chaptersMap, setChaptersMap] = useState<Record<string, ChapterSummary[]>>({});
@@ -121,6 +126,13 @@ export default function MyPage() {
   useEffect(() => {
     if (status === 'authenticated') loadBooks();
   }, [status, loadBooks]);
+
+  /* ── 정렬된 책 목록 ── */
+  const sortedBooks = [...books].sort((a, b) => {
+    if (sortKey === 'updated') return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+    if (sortKey === 'created') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    return a.title.localeCompare(b.title, 'ko');
+  });
 
   /* ── 닉네임 저장 ── */
   const saveNickname = async () => {
@@ -198,7 +210,7 @@ export default function MyPage() {
   if (status === 'loading') {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: TOKENS.bg }}>
-        <p style={{ fontSize: 16, color: TOKENS.muted, fontFamily: TOKENS.sans }}>잠시만요...</p>
+        <p style={{ fontSize: 14, color: TOKENS.muted, fontFamily: TOKENS.sans, letterSpacing: 1 }}>···</p>
       </div>
     );
   }
@@ -207,301 +219,441 @@ export default function MyPage() {
   const email = session?.user?.email ?? '';
 
   return (
-    <div style={{ minHeight: '100vh', background: TOKENS.bg, fontFamily: TOKENS.serif, color: TOKENS.text }}>
+    <div style={{ minHeight: '100vh', background: TOKENS.bg, fontFamily: TOKENS.sans, color: TOKENS.text }}>
 
-      {/* ── 헤더 ── */}
+      {/* ━━━━ 헤더 ━━━━ */}
       <header style={{
-        position: 'sticky', top: 0, zIndex: 10,
-        background: 'rgba(250,250,248,0.95)', backdropFilter: 'blur(12px)',
+        position: 'sticky', top: 0, zIndex: 50,
+        background: 'rgba(250,250,248,0.92)', backdropFilter: 'blur(12px)',
         borderBottom: `1px solid ${TOKENS.borderLight}`,
-        display: 'flex', alignItems: 'center', padding: '0 20px', height: 52,
-        gap: 12,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 24px', height: 60,
       }}>
         <button
-          onClick={() => router.back()}
-          style={{ background: 'none', border: 'none', color: TOKENS.subtext, fontSize: 14, cursor: 'pointer', fontFamily: TOKENS.sans, padding: '8px 0', minHeight: 44 }}
+          onClick={() => router.push('/')}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+            fontFamily: TOKENS.serif, fontSize: 16, fontWeight: 400,
+            letterSpacing: '-0.02em', color: TOKENS.text,
+          }}
         >
-          ← 뒤로
-        </button>
-        <span style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em' }}>
           나의이야기
-        </span>
+        </button>
         <button
           onClick={handleLogout}
-          style={{ background: 'none', border: `1px solid ${TOKENS.border}`, borderRadius: TOKENS.radiusSm, color: TOKENS.muted, fontSize: 13, cursor: 'pointer', fontFamily: TOKENS.sans, padding: '6px 12px', minHeight: 36 }}
+          style={{
+            background: 'transparent', border: `1px solid ${TOKENS.border}`,
+            borderRadius: 40, padding: '7px 16px',
+            fontSize: 12, cursor: 'pointer', color: TOKENS.subtext,
+            fontFamily: TOKENS.sans, fontWeight: 400,
+          }}
         >
           로그아웃
         </button>
       </header>
 
-      <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px 80px' }}>
+      <div style={{ maxWidth: 680, margin: '0 auto', padding: '40px 20px 100px' }}>
 
-        {/* ── 프로필 ── */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 16,
-          padding: '20px 24px',
-          background: TOKENS.card,
-          borderRadius: 12,
-          border: `1px solid ${TOKENS.borderLight}`,
-          boxShadow: TOKENS.shadowLg,
-          marginBottom: 32,
-        }}>
-          {/* 아바타 */}
-          <div style={{
-            width: 52, height: 52, borderRadius: '50%',
-            background: `linear-gradient(135deg, ${TOKENS.accent}, #c8924a)`,
-            color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 22, fontWeight: 600, flexShrink: 0,
-          }}>
-            {(nickname || email).slice(0, 1).toUpperCase()}
-          </div>
+        {/* ━━━━ 프로필 ━━━━ */}
+        <div style={{ marginBottom: 44 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            {/* 아바타 */}
+            <div style={{
+              width: 48, height: 48, borderRadius: '50%',
+              background: `linear-gradient(135deg, ${TOKENS.accent}, #c8924a)`,
+              color: '#fff', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', fontSize: 20, fontWeight: 500,
+              flexShrink: 0, fontFamily: TOKENS.serif,
+            }}>
+              {(nickname || email).slice(0, 1).toUpperCase()}
+            </div>
 
-          {/* 이름/이메일 */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            {isEditingNickname ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <input
-                  value={nicknameInput}
-                  onChange={(e) => setNicknameInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') saveNickname(); }}
-                  placeholder="닉네임 (최대 20자)"
-                  maxLength={20}
-                  autoFocus
-                  style={{
-                    border: `1.5px solid ${TOKENS.accent}`, borderRadius: TOKENS.radiusSm,
-                    padding: '8px 12px', fontSize: 16, outline: 'none',
-                    fontFamily: TOKENS.serif, color: TOKENS.text,
-                  }}
-                />
-                {nicknameError && <p style={{ fontSize: 12, color: '#e53e3e', margin: 0, fontFamily: TOKENS.sans }}>{nicknameError}</p>}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={saveNickname} disabled={nicknameSaving}
-                    style={{ background: TOKENS.dark, color: '#fff', border: 'none', borderRadius: TOKENS.radiusSm, padding: '8px 16px', fontSize: 13, fontFamily: TOKENS.sans, cursor: 'pointer', minHeight: 36 }}>
-                    {nicknameSaving ? '저장 중…' : '저장'}
-                  </button>
-                  <button onClick={() => { setIsEditingNickname(false); setNicknameInput(nickname); setNicknameError(''); }}
-                    style={{ background: 'transparent', color: TOKENS.muted, border: `1px solid ${TOKENS.border}`, borderRadius: TOKENS.radiusSm, padding: '8px 16px', fontSize: 13, fontFamily: TOKENS.sans, cursor: 'pointer', minHeight: 36 }}>
-                    취소
-                  </button>
+            {/* 이름 */}
+            <div style={{ flex: 1 }}>
+              {isEditingNickname ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <input
+                    value={nicknameInput}
+                    onChange={(e) => setNicknameInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') saveNickname(); }}
+                    placeholder="닉네임 (최대 20자)"
+                    maxLength={20}
+                    autoFocus
+                    style={{
+                      border: `1.5px solid ${TOKENS.accent}`, borderRadius: 8,
+                      padding: '8px 12px', fontSize: 15, outline: 'none',
+                      fontFamily: TOKENS.sans, color: TOKENS.text, background: '#FFF',
+                    }}
+                  />
+                  {nicknameError && <p style={{ fontSize: 12, color: '#e53e3e', margin: 0 }}>{nicknameError}</p>}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={saveNickname} disabled={nicknameSaving}
+                      style={{ background: TOKENS.dark, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12, cursor: 'pointer' }}>
+                      {nicknameSaving ? '저장 중…' : '저장'}
+                    </button>
+                    <button onClick={() => { setIsEditingNickname(false); setNicknameInput(nickname); setNicknameError(''); }}
+                      style={{ background: 'transparent', color: TOKENS.muted, border: `1px solid ${TOKENS.border}`, borderRadius: 8, padding: '7px 14px', fontSize: 12, cursor: 'pointer' }}>
+                      취소
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                  <span style={{ fontSize: 17, fontWeight: 600, color: TOKENS.text }}>{nickname || '닉네임 없음'}</span>
-                  <button onClick={() => setIsEditingNickname(true)}
-                    style={{ background: 'none', border: 'none', color: TOKENS.muted, fontSize: 13, cursor: 'pointer', fontFamily: TOKENS.sans, padding: '2px 6px' }}>
-                    ✏ 수정
-                  </button>
-                </div>
-                <p style={{ fontSize: 13, color: TOKENS.muted, margin: 0, fontFamily: TOKENS.sans }}>{email}</p>
-              </div>
-            )}
+              ) : (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 16, fontWeight: 500, color: TOKENS.text, fontFamily: TOKENS.serif }}>{nickname || '이름 없음'}</span>
+                    <button onClick={() => setIsEditingNickname(true)}
+                      style={{ background: 'none', border: 'none', color: TOKENS.muted, fontSize: 11, cursor: 'pointer', padding: '2px 4px', letterSpacing: 0.5 }}>
+                      수정
+                    </button>
+                  </div>
+                  <p style={{ fontSize: 12, color: TOKENS.muted, margin: '2px 0 0', letterSpacing: 0.3 }}>{email}</p>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* ── 내 책 보관함 헤더 ── */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0, letterSpacing: '-0.02em' }}>내 책 보관함</h2>
+        {/* ━━━━ 보관함 헤더 ━━━━ */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 20 }}>
+          <div>
+            <p style={{ fontSize: 10, letterSpacing: 3, color: TOKENS.accent, textTransform: 'uppercase', marginBottom: 6, fontWeight: 500 }}>
+              My Library
+            </p>
+            <h2 style={{ fontFamily: TOKENS.serif, fontSize: 22, fontWeight: 300, margin: 0, letterSpacing: '-0.025em', color: TOKENS.text }}>
+              내 책 보관함
+              {books.length > 0 && (
+                <span style={{ fontSize: 14, color: TOKENS.muted, fontFamily: TOKENS.sans, fontWeight: 300, marginLeft: 10 }}>
+                  {books.length}권
+                </span>
+              )}
+            </h2>
+          </div>
+
           <button
             onClick={() => router.push('/')}
             style={{
-              background: TOKENS.dark, color: '#FAFAF9',
-              border: 'none', borderRadius: TOKENS.radiusSm,
-              padding: '8px 16px', fontSize: 13, fontFamily: TOKENS.sans,
-              fontWeight: 500, cursor: 'pointer', minHeight: 36,
+              background: TOKENS.dark, color: '#FAFAF9', border: 'none',
+              borderRadius: 40, padding: '9px 20px',
+              fontSize: 13, fontWeight: 500, cursor: 'pointer',
+              letterSpacing: '0.01em', flexShrink: 0,
             }}
           >
-            + 새 책 만들기
+            + 새 책
           </button>
         </div>
 
-        {/* ── 책 목록 ── */}
+        {/* ━━━━ 정렬 탭 ━━━━ */}
+        {books.length > 1 && (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
+            {([
+              { key: 'updated', label: '최근 수정순' },
+              { key: 'created', label: '최근 생성순' },
+              { key: 'title', label: '이름순' },
+            ] as { key: SortKey; label: string }[]).map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setSortKey(key)}
+                style={{
+                  background: sortKey === key ? TOKENS.dark : 'transparent',
+                  color: sortKey === key ? '#FAFAF9' : TOKENS.subtext,
+                  border: `1px solid ${sortKey === key ? TOKENS.dark : TOKENS.border}`,
+                  borderRadius: 40, padding: '6px 14px',
+                  fontSize: 12, cursor: 'pointer', transition: 'all 0.15s',
+                  fontWeight: sortKey === key ? 500 : 400,
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* ━━━━ 책 목록 ━━━━ */}
         {booksLoading ? (
-          <div style={{ textAlign: 'center', padding: '48px 0', color: TOKENS.muted, fontFamily: TOKENS.sans, fontSize: 14 }}>
-            불러오는 중…
+          <div style={{ textAlign: 'center', padding: '80px 0' }}>
+            <p style={{ fontSize: 12, color: TOKENS.muted, letterSpacing: 2 }}>···</p>
           </div>
         ) : books.length === 0 ? (
+          /* ── 빈 상태 ── */
           <div style={{
-            textAlign: 'center', padding: '60px 20px',
-            background: TOKENS.card, borderRadius: 12,
+            textAlign: 'center', padding: '72px 24px',
+            background: '#FFF', borderRadius: 20,
             border: `1px solid ${TOKENS.borderLight}`,
           }}>
-            <p style={{ fontSize: 16, color: TOKENS.muted, marginBottom: 20, fontFamily: TOKENS.sans }}>
-              아직 작성한 책이 없습니다
+            {/* 책 아이콘 */}
+            <div style={{ marginBottom: 28 }}>
+              <div style={{
+                width: 72, height: 88, margin: '0 auto',
+                background: `linear-gradient(160deg, #8B7355, #6B5535)`,
+                borderRadius: '4px 8px 8px 4px',
+                position: 'relative',
+                boxShadow: '3px 3px 12px rgba(0,0,0,0.15)',
+              }}>
+                <div style={{
+                  position: 'absolute', left: 0, top: 0, bottom: 0, width: 8,
+                  background: 'rgba(0,0,0,0.2)', borderRadius: '4px 0 0 4px',
+                }} />
+                <div style={{
+                  position: 'absolute', inset: '16px 12px',
+                  display: 'flex', flexDirection: 'column', gap: 5,
+                  justifyContent: 'center',
+                }}>
+                  {[1,2,3].map(i => (
+                    <div key={i} style={{ height: 1, background: 'rgba(255,255,255,0.25)', borderRadius: 1 }} />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <h3 style={{
+              fontFamily: TOKENS.serif, fontSize: 20, fontWeight: 300,
+              color: TOKENS.text, marginBottom: 10, letterSpacing: '-0.02em',
+            }}>
+              첫 번째 책을 만들어보세요
+            </h3>
+            <p style={{
+              fontSize: 13.5, color: TOKENS.subtext, lineHeight: 1.75,
+              marginBottom: 32, wordBreak: 'keep-all', fontWeight: 300,
+            }}>
+              AI와의 대화로 당신의 이야기를<br />한 권의 책으로 완성할 수 있어요.
             </p>
             <button
               onClick={() => router.push('/')}
-              style={{ background: TOKENS.dark, color: '#FAFAF9', border: 'none', borderRadius: TOKENS.radiusSm, padding: '12px 24px', fontSize: 15, fontFamily: TOKENS.sans, cursor: 'pointer', minHeight: 48 }}
+              style={{
+                background: TOKENS.dark, color: '#FAFAF9', border: 'none',
+                borderRadius: 40, padding: '14px 32px',
+                fontSize: 14, fontWeight: 500, cursor: 'pointer',
+                letterSpacing: '0.01em',
+              }}
             >
-              첫 번째 책 시작하기
+              이야기 시작하기
             </button>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {books.map((book) => {
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {sortedBooks.map((book) => {
               const isExpanded = expandedBook === book.id;
               const grad = coverGradient(book.title);
+              const doneCount = (chaptersMap[book.id] || []).filter(c => c.is_done).length;
+              const totalCount = chaptersMap[book.id]?.length ?? book.chapter_count;
 
               return (
-                <div key={book.id} style={{
-                  background: TOKENS.card,
-                  borderRadius: 12,
-                  border: `1px solid ${TOKENS.borderLight}`,
-                  boxShadow: TOKENS.shadowLg,
-                  overflow: 'hidden',
-                }}>
-                  {/* ── 책 카드 본문 ── */}
-                  <div style={{ display: 'flex', gap: 0 }}>
-                    {/* 왼쪽: 표지 썸네일 */}
-                    <div style={{
-                      width: 96, flexShrink: 0,
-                      background: grad,
-                      display: 'flex', flexDirection: 'column',
-                      alignItems: 'center', justifyContent: 'center',
-                      padding: '20px 10px', minHeight: 130,
-                      color: 'rgba(255,255,255,0.9)',
-                    }}>
-                      <div style={{ width: 24, height: 1, background: 'rgba(255,255,255,0.3)', marginBottom: 10 }} />
+                <div
+                  key={book.id}
+                  style={{
+                    background: '#FFF', borderRadius: 16,
+                    border: `1px solid ${TOKENS.borderLight}`,
+                    overflow: 'hidden',
+                    boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+                    transition: 'box-shadow 0.2s',
+                  }}
+                >
+                  {/* ── 카드 본문 ── */}
+                  <div style={{ display: 'flex' }}>
+
+                    {/* 책 표지 */}
+                    <div
+                      style={{
+                        width: 88, flexShrink: 0,
+                        background: grad,
+                        display: 'flex', flexDirection: 'column',
+                        alignItems: 'center', justifyContent: 'center',
+                        padding: '20px 8px', minHeight: 144,
+                        position: 'relative', cursor: 'pointer',
+                      }}
+                      onClick={() => router.push(`/book?id=${book.id}`)}
+                    >
+                      {/* 책 등 */}
+                      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 6, background: 'rgba(0,0,0,0.2)' }} />
+                      {/* 장식선 */}
+                      <div style={{ width: 28, height: 1, background: 'rgba(255,255,255,0.25)', marginBottom: 8 }} />
                       <p style={{
-                        fontSize: 11, fontWeight: 400, lineHeight: 1.4,
+                        fontSize: 10, fontWeight: 300, lineHeight: 1.5,
                         textAlign: 'center', wordBreak: 'keep-all',
-                        letterSpacing: '-0.01em', maxWidth: 72,
+                        letterSpacing: '-0.01em',
+                        color: 'rgba(255,255,255,0.85)',
+                        maxWidth: 64, fontFamily: TOKENS.serif,
                       }}>
                         {book.title}
                       </p>
-                      <div style={{ width: 24, height: 1, background: 'rgba(255,255,255,0.3)', marginTop: 10 }} />
+                      <div style={{ width: 28, height: 1, background: 'rgba(255,255,255,0.25)', marginTop: 8 }} />
+                      {/* 읽기 힌트 */}
+                      <p style={{
+                        position: 'absolute', bottom: 8,
+                        fontSize: 9, color: 'rgba(255,255,255,0.4)',
+                        letterSpacing: 1, fontFamily: TOKENS.sans,
+                        textTransform: 'uppercase',
+                      }}>
+                        Read
+                      </p>
                     </div>
 
-                    {/* 오른쪽: 책 정보 + 액션 */}
-                    <div style={{ flex: 1, padding: '18px 18px 14px', display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
+                    {/* 책 정보 */}
+                    <div style={{ flex: 1, padding: '18px 20px 16px', display: 'flex', flexDirection: 'column', gap: 0, minWidth: 0 }}>
                       {/* 제목 */}
-                      <h3 style={{ fontSize: 17, fontWeight: 600, margin: 0, lineHeight: 1.3, letterSpacing: '-0.02em', color: TOKENS.text }}>
+                      <h3 style={{
+                        fontFamily: TOKENS.serif, fontSize: 17, fontWeight: 400,
+                        margin: '0 0 4px', lineHeight: 1.3, letterSpacing: '-0.02em', color: TOKENS.text,
+                      }}>
                         {book.title}
                       </h3>
 
                       {/* 저자 · 날짜 */}
-                      <p style={{ fontSize: 13, color: TOKENS.muted, margin: 0, fontFamily: TOKENS.sans }}>
-                        {book.author || '저자 미상'} · {formatDate(book.updated_at)} 수정
+                      <p style={{ fontSize: 12, color: TOKENS.muted, margin: '0 0 10px', letterSpacing: 0.2 }}>
+                        {book.author || '저자 미상'} &nbsp;·&nbsp; {formatDate(book.updated_at)} 수정
                       </p>
 
-                      {/* 챕터 통계 + 공유 상태 */}
-                      <div style={{ display: 'flex', gap: 8, marginTop: 2, flexWrap: 'wrap' }}>
+                      {/* 배지 */}
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
                         <span style={{
-                          fontSize: 11, color: TOKENS.accent, fontFamily: TOKENS.sans,
-                          background: '#fbf7f0', borderRadius: 20, padding: '3px 10px',
-                          border: `1px solid ${TOKENS.accentBorder}`,
+                          fontSize: 11, color: TOKENS.accent,
+                          background: '#fdf5ec', borderRadius: 20, padding: '3px 10px',
+                          border: `1px solid #f0d9b8`,
                         }}>
                           {book.chapter_count}개 챕터
                         </span>
                         {book.is_public && (
-                          <span style={{ fontSize: 11, fontFamily: TOKENS.sans, background: '#F0FDF4', color: '#16A34A', borderRadius: 20, padding: '3px 10px', border: '1px solid #BBF7D0' }}>
+                          <span style={{ fontSize: 11, background: '#F0FDF4', color: '#16A34A', borderRadius: 20, padding: '3px 10px', border: '1px solid #BBF7D0' }}>
                             공개
                           </span>
                         )}
                         {book.share_token && (
-                          <span style={{ fontSize: 11, fontFamily: TOKENS.sans, background: '#EFF6FF', color: '#1D4ED8', borderRadius: 20, padding: '3px 10px', border: '1px solid #BFDBFE' }}>
+                          <span style={{ fontSize: 11, background: '#EFF6FF', color: '#1D4ED8', borderRadius: 20, padding: '3px 10px', border: '1px solid #BFDBFE' }}>
                             가족 공유
                           </span>
                         )}
                       </div>
 
                       {/* 액션 버튼 */}
-                      <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                         <button
                           onClick={() => continueBook(book.id)}
                           style={{
-                            background: TOKENS.dark, color: '#FAFAF9',
-                            border: 'none', borderRadius: TOKENS.radiusSm,
-                            padding: '8px 16px', fontSize: 13, fontFamily: TOKENS.sans,
-                            fontWeight: 500, cursor: 'pointer', minHeight: 36,
+                            background: TOKENS.dark, color: '#FAFAF9', border: 'none',
+                            borderRadius: 40, padding: '8px 18px',
+                            fontSize: 12, fontWeight: 500, cursor: 'pointer',
                           }}
                         >
                           이어쓰기
                         </button>
                         <button
-                          onClick={() => toggleChapters(book.id)}
+                          onClick={() => router.push(`/book?id=${book.id}`)}
                           style={{
                             background: 'transparent', color: TOKENS.subtext,
-                            border: `1px solid ${TOKENS.border}`, borderRadius: TOKENS.radiusSm,
-                            padding: '8px 14px', fontSize: 13, fontFamily: TOKENS.sans,
-                            cursor: 'pointer', minHeight: 36,
+                            border: `1px solid ${TOKENS.border}`, borderRadius: 40,
+                            padding: '7px 16px', fontSize: 12, cursor: 'pointer',
+                          }}
+                        >
+                          읽기
+                        </button>
+                        <button
+                          onClick={() => toggleChapters(book.id)}
+                          style={{
+                            background: 'transparent',
+                            color: isExpanded ? TOKENS.accent : TOKENS.subtext,
+                            border: `1px solid ${isExpanded ? TOKENS.accentBorder : TOKENS.border}`,
+                            borderRadius: 40, padding: '7px 14px',
+                            fontSize: 12, cursor: 'pointer',
                           }}
                         >
                           목차 {isExpanded ? '▲' : '▼'}
                         </button>
-                        {(book.is_public || book.share_token) && (
+
+                        {/* 더보기 메뉴 */}
+                        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                          {(book.is_public || book.share_token) && (
+                            <button
+                              onClick={() => copyBookLink(book)}
+                              style={{
+                                background: copiedBookId === book.id ? '#EFF6FF' : 'transparent',
+                                color: copiedBookId === book.id ? '#1D4ED8' : TOKENS.muted,
+                                border: `1px solid ${copiedBookId === book.id ? '#BFDBFE' : TOKENS.borderLight}`,
+                                borderRadius: 40, padding: '7px 12px',
+                                fontSize: 11, cursor: 'pointer', transition: 'all 0.15s',
+                              }}
+                            >
+                              {copiedBookId === book.id ? '복사됨' : '링크'}
+                            </button>
+                          )}
                           <button
-                            onClick={() => copyBookLink(book)}
+                            onClick={() => { setDeleteTarget(book); setDeleteConfirmed(false); }}
                             style={{
-                              background: copiedBookId === book.id ? '#EFF6FF' : 'transparent',
-                              color: copiedBookId === book.id ? '#1D4ED8' : TOKENS.subtext,
-                              border: `1px solid ${copiedBookId === book.id ? '#BFDBFE' : TOKENS.border}`,
-                              borderRadius: TOKENS.radiusSm,
-                              padding: '8px 14px', fontSize: 13, fontFamily: TOKENS.sans,
-                              cursor: 'pointer', minHeight: 36, transition: 'all 0.15s',
+                              background: 'transparent', color: TOKENS.muted,
+                              border: `1px solid ${TOKENS.borderLight}`,
+                              borderRadius: 40, padding: '7px 12px',
+                              fontSize: 11, cursor: 'pointer',
                             }}
                           >
-                            {copiedBookId === book.id ? '복사됨' : '링크 복사'}
+                            삭제
                           </button>
-                        )}
-                        <button
-                          onClick={() => { setDeleteTarget(book); setDeleteConfirmed(false); }}
-                          style={{
-                            background: 'transparent', color: '#c0392b',
-                            border: `1px solid #f5c6c0`, borderRadius: TOKENS.radiusSm,
-                            padding: '8px 14px', fontSize: 13, fontFamily: TOKENS.sans,
-                            cursor: 'pointer', minHeight: 36,
-                          }}
-                        >
-                          삭제
-                        </button>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* ── 챕터 목록 (아코디언) ── */}
+                  {/* ── 챕터 목록 ── */}
                   {isExpanded && (
                     <div style={{ borderTop: `1px solid ${TOKENS.borderLight}` }}>
                       {chaptersLoading === book.id ? (
-                        <div style={{ padding: '16px 20px', color: TOKENS.muted, fontFamily: TOKENS.sans, fontSize: 13 }}>
-                          불러오는 중…
+                        <div style={{ padding: '16px 20px', color: TOKENS.muted, fontSize: 13, textAlign: 'center' }}>
+                          ···
                         </div>
                       ) : (chaptersMap[book.id] || []).length === 0 ? (
-                        <div style={{ padding: '16px 20px', color: TOKENS.muted, fontFamily: TOKENS.sans, fontSize: 13 }}>
+                        <div style={{ padding: '16px 24px', color: TOKENS.muted, fontSize: 13 }}>
                           챕터가 없습니다.
                         </div>
                       ) : (
-                        (chaptersMap[book.id] || []).map((ch, idx) => (
-                          <button
-                            key={ch.id}
-                            onClick={() => continueChapter(book.id, idx)}
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 14,
-                              padding: '13px 20px', width: '100%',
-                              background: idx % 2 === 0 ? TOKENS.card : TOKENS.bg,
-                              border: 'none', borderBottom: `1px solid ${TOKENS.borderLight}`,
-                              cursor: 'pointer', textAlign: 'left',
-                              fontFamily: TOKENS.serif, minHeight: 52,
-                            }}
-                          >
-                            <span style={{ fontSize: 11, color: TOKENS.muted, fontFamily: TOKENS.sans, minWidth: 24, fontWeight: 600 }}>
-                              {String(idx + 1).padStart(2, '0')}
-                            </span>
-                            <span style={{ flex: 1, fontSize: 15, color: TOKENS.text, lineHeight: 1.4 }}>
-                              {ch.title}
-                            </span>
-                            <span style={{
-                              fontSize: 11, padding: '3px 9px', borderRadius: 12, fontFamily: TOKENS.sans, fontWeight: 500,
-                              ...(ch.is_done
-                                ? { background: '#e8f5e9', color: '#2e7d32' }
-                                : { background: '#fff8e8', color: '#b45309' }
-                              ),
-                            }}>
-                              {ch.is_done ? '완료' : '작성 중'}
-                            </span>
-                          </button>
-                        ))
+                        <>
+                          {/* 진행률 바 */}
+                          {chaptersMap[book.id] && (
+                            <div style={{ padding: '12px 20px 0' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                                <span style={{ fontSize: 11, color: TOKENS.muted }}>진행률</span>
+                                <span style={{ fontSize: 11, color: TOKENS.accent, fontWeight: 500 }}>
+                                  {doneCount}/{totalCount} 챕터 완료
+                                </span>
+                              </div>
+                              <div style={{ height: 3, background: TOKENS.borderLight, borderRadius: 2 }}>
+                                <div style={{
+                                  height: '100%',
+                                  width: totalCount > 0 ? `${(doneCount / totalCount) * 100}%` : '0%',
+                                  background: TOKENS.accent, borderRadius: 2,
+                                  transition: 'width 0.4s ease',
+                                }} />
+                              </div>
+                            </div>
+                          )}
+                          {(chaptersMap[book.id] || []).map((ch, idx) => (
+                            <button
+                              key={ch.id}
+                              onClick={() => continueChapter(book.id, idx)}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 14,
+                                padding: '12px 20px', width: '100%',
+                                background: 'transparent',
+                                border: 'none', borderTop: `1px solid ${TOKENS.borderLight}`,
+                                cursor: 'pointer', textAlign: 'left',
+                                fontFamily: TOKENS.sans,
+                              }}
+                            >
+                              <span style={{ fontSize: 10, color: TOKENS.muted, minWidth: 22, fontWeight: 600, letterSpacing: 0.5 }}>
+                                {String(idx + 1).padStart(2, '0')}
+                              </span>
+                              <span style={{ flex: 1, fontSize: 14, color: TOKENS.text, lineHeight: 1.4, fontFamily: TOKENS.serif }}>
+                                {ch.title}
+                              </span>
+                              <span style={{
+                                fontSize: 10, padding: '2px 8px', borderRadius: 10, flexShrink: 0,
+                                ...(ch.is_done
+                                  ? { background: '#e8f5e9', color: '#2e7d32' }
+                                  : { background: '#fef9ee', color: '#b45309' }
+                                ),
+                              }}>
+                                {ch.is_done ? '완료' : '작성 중'}
+                              </span>
+                            </button>
+                          ))}
+                        </>
                       )}
                     </div>
                   )}
@@ -512,45 +664,46 @@ export default function MyPage() {
         )}
       </div>
 
-      {/* ── 삭제 확인 모달 (바텀 시트) ── */}
+      {/* ━━━━ 삭제 확인 모달 ━━━━ */}
       {deleteTarget && (
         <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 0 env(safe-area-inset-bottom)' }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
           onClick={(e) => { if (e.target === e.currentTarget) setDeleteTarget(null); }}
         >
           <div style={{
-            background: TOKENS.card, borderRadius: '16px 16px 0 0',
-            padding: '28px 24px 32px', width: '100%', maxWidth: 480,
-            display: 'flex', flexDirection: 'column', gap: 16,
+            background: '#FFF', borderRadius: '20px 20px 0 0',
+            padding: '28px 24px max(32px, env(safe-area-inset-bottom))', width: '100%', maxWidth: 480,
           }}>
-            <div style={{ width: 36, height: 4, background: TOKENS.border, borderRadius: 2, margin: '0 auto' }} />
-            <h2 style={{ fontSize: 19, fontWeight: 600, margin: 0, color: TOKENS.text }}>책을 삭제할까요?</h2>
-            <p style={{ fontSize: 15, color: TOKENS.subtext, lineHeight: 1.6, margin: 0, fontFamily: TOKENS.sans }}>
-              「{deleteTarget.title}」을 삭제하면 모든 챕터와 내용이 사라집니다.<br />이 작업은 되돌릴 수 없습니다.
+            <div style={{ width: 32, height: 3, background: TOKENS.border, borderRadius: 2, margin: '0 auto 24px' }} />
+            <h2 style={{ fontFamily: TOKENS.serif, fontSize: 20, fontWeight: 300, margin: '0 0 10px', letterSpacing: '-0.02em' }}>
+              책을 삭제할까요?
+            </h2>
+            <p style={{ fontSize: 14, color: TOKENS.subtext, lineHeight: 1.65, margin: '0 0 24px', wordBreak: 'keep-all' }}>
+              「{deleteTarget.title}」을 삭제하면 모든 챕터와 내용이 사라집니다. 이 작업은 되돌릴 수 없습니다.
             </p>
 
             {!deleteConfirmed ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <button onClick={() => setDeleteConfirmed(true)}
-                  style={{ padding: '14px', background: '#fdf0ee', color: '#c0392b', border: `1px solid #f5c6c0`, borderRadius: TOKENS.radiusSm, fontSize: 16, fontFamily: TOKENS.sans, cursor: 'pointer', minHeight: 52 }}>
+                  style={{ padding: '14px', background: '#fdf0ee', color: '#c0392b', border: `1px solid #f5c6c0`, borderRadius: 12, fontSize: 15, cursor: 'pointer' }}>
                   네, 삭제하겠습니다
                 </button>
                 <button onClick={() => setDeleteTarget(null)}
-                  style={{ padding: '14px', background: TOKENS.warm, color: TOKENS.muted, border: 'none', borderRadius: TOKENS.radiusSm, fontSize: 16, fontFamily: TOKENS.sans, cursor: 'pointer', minHeight: 52 }}>
+                  style={{ padding: '14px', background: TOKENS.warm, color: TOKENS.muted, border: 'none', borderRadius: 12, fontSize: 15, cursor: 'pointer' }}>
                   취소
                 </button>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
-                <p style={{ fontSize: 14, color: '#c0392b', margin: 0, fontFamily: TOKENS.sans }}>
-                  ⚠️ 정말 삭제합니다. 아래 버튼을 한 번 더 눌러주세요.
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <p style={{ fontSize: 13, color: '#c0392b', margin: '0 0 4px' }}>
+                  정말 삭제합니다. 아래 버튼을 한 번 더 눌러주세요.
                 </p>
                 <button onClick={deleteBook} disabled={deleting}
-                  style={{ padding: '14px', background: '#c0392b', color: '#fff', border: 'none', borderRadius: TOKENS.radiusSm, fontSize: 17, fontFamily: TOKENS.sans, fontWeight: 600, cursor: deleting ? 'wait' : 'pointer', minHeight: 52 }}>
+                  style={{ padding: '14px', background: '#c0392b', color: '#fff', border: 'none', borderRadius: 12, fontSize: 16, fontWeight: 600, cursor: deleting ? 'wait' : 'pointer' }}>
                   {deleting ? '삭제 중…' : '최종 삭제'}
                 </button>
                 <button onClick={() => { setDeleteTarget(null); setDeleteConfirmed(false); }}
-                  style={{ padding: '14px', background: TOKENS.warm, color: TOKENS.muted, border: 'none', borderRadius: TOKENS.radiusSm, fontSize: 16, fontFamily: TOKENS.sans, cursor: 'pointer', minHeight: 52 }}>
+                  style={{ padding: '14px', background: TOKENS.warm, color: TOKENS.muted, border: 'none', borderRadius: 12, fontSize: 15, cursor: 'pointer' }}>
                   취소
                 </button>
               </div>
