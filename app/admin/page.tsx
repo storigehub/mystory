@@ -63,6 +63,10 @@ export default function AdminPage() {
   const [books, setBooks] = useState<BookRow[]>([]);
   const [search, setSearch] = useState('');
 
+  const [migrateCount, setMigrateCount] = useState<number | null>(null);
+  const [migrating, setMigrating] = useState(false);
+  const [migrateResult, setMigrateResult] = useState<string | null>(null);
+
   const fetchDashboard = async (pw: string) => {
     setLoading(true);
     try {
@@ -78,10 +82,33 @@ export default function AdminPage() {
       setBooks(data.books ?? []);
       setAuthed(true);
       setAuthError('');
+      // 마이그레이션 대기 사진 수 확인
+      fetch('/api/admin/migrate-photos', { headers: { 'x-admin-password': pw } })
+        .then((r) => r.json())
+        .then((d) => setMigrateCount(d.pendingCount ?? 0))
+        .catch(() => {});
     } catch {
       setAuthError('서버 오류');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const runMigration = async () => {
+    setMigrating(true);
+    setMigrateResult(null);
+    try {
+      const res = await fetch('/api/admin/migrate-photos', {
+        method: 'POST',
+        headers: { 'x-admin-password': password },
+      });
+      const data = await res.json();
+      setMigrateResult(data.message || '완료');
+      setMigrateCount(data.failed ?? 0);
+    } catch {
+      setMigrateResult('오류가 발생했습니다');
+    } finally {
+      setMigrating(false);
     }
   };
 
@@ -174,6 +201,40 @@ export default function AdminPage() {
                 </span>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* 사진 마이그레이션 */}
+        {migrateCount !== null && (
+          <div style={{ ...card, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 500, fontFamily: TOKENS.sans, color: TOKENS.text, margin: '0 0 2px' }}>
+                Cloudinary 사진 마이그레이션
+              </p>
+              <p style={{ fontSize: 12, color: TOKENS.muted, fontFamily: TOKENS.sans, margin: 0 }}>
+                base64로 저장된 사진 {migrateCount}개를 Cloudinary URL로 변환합니다
+              </p>
+            </div>
+            <div style={{ flex: 1 }} />
+            {migrateResult && (
+              <span style={{ fontSize: 12, color: migrateResult.includes('실패') ? '#c0392b' : '#16a34a', fontFamily: TOKENS.sans }}>
+                {migrateResult}
+              </span>
+            )}
+            <button
+              onClick={runMigration}
+              disabled={migrating || migrateCount === 0}
+              style={{
+                padding: '8px 18px', borderRadius: TOKENS.radiusSm,
+                background: migrateCount === 0 ? TOKENS.borderLight : TOKENS.dark,
+                color: migrateCount === 0 ? TOKENS.muted : '#FAFAF9',
+                border: 'none', fontSize: 13, fontFamily: TOKENS.sans,
+                cursor: migrating || migrateCount === 0 ? 'not-allowed' : 'pointer',
+                flexShrink: 0,
+              }}
+            >
+              {migrating ? '마이그레이션 중…' : migrateCount === 0 ? '완료' : `${migrateCount}개 마이그레이션`}
+            </button>
           </div>
         )}
 
