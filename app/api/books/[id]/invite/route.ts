@@ -20,20 +20,17 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'RESEND_API_KEY가 설정되지 않았습니다' }, { status: 500 });
     }
 
-    const { email, type, token } = await req.json();
+    const { email, type } = await req.json();
 
     if (!email || !email.includes('@')) {
       return NextResponse.json({ error: '올바른 이메일 주소를 입력해주세요' }, { status: 400 });
     }
-    if (!token) {
-      return NextResponse.json({ error: '공유 링크를 먼저 생성해주세요' }, { status: 400 });
-    }
 
-    // 소유자 검증 + 책 정보 조회
+    // 소유자 검증 + 책 정보 + 토큰 조회
     const supabase = createServerClient();
     const { data: book, error: fetchErr } = await supabase
       .from('books')
-      .select('user_id, title, author')
+      .select('user_id, title, author, share_token, interviewer_token')
       .eq('id', params.id)
       .single();
 
@@ -46,11 +43,19 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: '접근 권한이 없습니다' }, { status: 403 });
     }
 
+    const isInterviewer = type === 'interviewer';
+    const token = isInterviewer
+      ? (bookData.interviewer_token || bookData.share_token)
+      : bookData.share_token;
+
+    if (!token) {
+      return NextResponse.json({ error: '공유 링크를 먼저 생성해주세요' }, { status: 400 });
+    }
+
     const origin = process.env.NEXTAUTH_URL || 'https://mystory-khaki.vercel.app';
     const bookTitle = bookData.title || '나의 이야기';
     const bookAuthor = bookData.author || '저자';
 
-    const isInterviewer = type === 'interviewer';
     const link = isInterviewer
       ? `${origin}/interviewer/${params.id}?token=${token}`
       : `${origin}/shared/${params.id}?token=${token}`;

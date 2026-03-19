@@ -24,8 +24,11 @@ export async function GET(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: '책을 찾을 수 없습니다' }, { status: 404 });
     }
 
-    // 접근 허용 조건: 공개이거나 토큰 일치
-    const tokenMatch = token && book.share_token && token === book.share_token;
+    // 접근 허용 조건: 공개이거나 share_token 또는 interviewer_token 일치
+    const tokenMatch = token && (
+      (book.share_token && token === book.share_token) ||
+      (book.interviewer_token && token === book.interviewer_token)
+    );
     if (!book.is_public && !tokenMatch) {
       return NextResponse.json({ error: '비공개 책입니다' }, { status: 403 });
     }

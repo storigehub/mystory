@@ -89,10 +89,15 @@ export default function BookPage() {
   const [shareLoading, setShareLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  /* 가족 링크 */
+  /* 가족 열람 링크 */
   const [shareToken, setShareToken] = useState<string | null>(null);
   const [familyLoading, setFamilyLoading] = useState(false);
   const [familyCopied, setFamilyCopied] = useState(false);
+
+  /* 인터뷰어 링크 (별도 토큰) */
+  const [interviewerToken, setInterviewerToken] = useState<string | null>(null);
+  const [interviewerLoading, setInterviewerLoading] = useState(false);
+  const [interviewerCopied, setInterviewerCopied] = useState(false);
 
   /* 이메일 초대 */
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -103,7 +108,7 @@ export default function BookPage() {
 
   const chapterRefs = useRef<Record<string, HTMLElement | null>>({});
 
-  /* is_public + share_token 초기값 로드 */
+  /* is_public + share_token + interviewer_token 초기값 로드 */
   useEffect(() => {
     if (!state.bookId) return;
     fetch(`/api/books/${state.bookId}`)
@@ -111,6 +116,7 @@ export default function BookPage() {
       .then((data) => {
         if (data.book?.is_public) setIsPublic(true);
         if (data.book?.share_token) setShareToken(data.book.share_token);
+        if (data.book?.interviewer_token) setInterviewerToken(data.book.interviewer_token);
       })
       .catch(() => {});
   }, [state.bookId]);
@@ -142,7 +148,11 @@ export default function BookPage() {
     if (!state.bookId) return;
     setFamilyLoading(true);
     try {
-      const res = await fetch(`/api/books/${state.bookId}/share`, { method: 'POST' });
+      const res = await fetch(`/api/books/${state.bookId}/share`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'reader' }),
+      });
       const data = await res.json();
       if (data.token) setShareToken(data.token);
     } catch { /* ignore */ }
@@ -153,7 +163,7 @@ export default function BookPage() {
     if (!state.bookId) return;
     setFamilyLoading(true);
     try {
-      await fetch(`/api/books/${state.bookId}/share`, { method: 'DELETE' });
+      await fetch(`/api/books/${state.bookId}/share?type=reader`, { method: 'DELETE' });
       setShareToken(null);
     } catch { /* ignore */ }
     finally { setFamilyLoading(false); }
@@ -168,15 +178,51 @@ export default function BookPage() {
     });
   };
 
+  const generateInterviewerLink = async () => {
+    if (!state.bookId) return;
+    setInterviewerLoading(true);
+    try {
+      const res = await fetch(`/api/books/${state.bookId}/share`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'interviewer' }),
+      });
+      const data = await res.json();
+      if (data.token) setInterviewerToken(data.token);
+    } catch { /* ignore */ }
+    finally { setInterviewerLoading(false); }
+  };
+
+  const revokeInterviewerLink = async () => {
+    if (!state.bookId) return;
+    setInterviewerLoading(true);
+    try {
+      await fetch(`/api/books/${state.bookId}/share?type=interviewer`, { method: 'DELETE' });
+      setInterviewerToken(null);
+    } catch { /* ignore */ }
+    finally { setInterviewerLoading(false); }
+  };
+
+  const copyInterviewerUrl = () => {
+    if (!interviewerToken) return;
+    const url = `${window.location.origin}/interviewer/${state.bookId}?token=${interviewerToken}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setInterviewerCopied(true);
+      setTimeout(() => setInterviewerCopied(false), 2000);
+    });
+  };
+
   const sendInviteEmail = async () => {
-    if (!inviteEmail || !shareToken || !state.bookId) return;
+    if (!inviteEmail || !state.bookId) return;
+    const hasToken = inviteType === 'reader' ? !!shareToken : !!interviewerToken;
+    if (!hasToken) return;
     setInviteSending(true);
     setInviteResult(null);
     try {
       const res = await fetch(`/api/books/${state.bookId}/invite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: inviteEmail, type: inviteType, token: shareToken }),
+        body: JSON.stringify({ email: inviteEmail, type: inviteType }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -190,16 +236,6 @@ export default function BookPage() {
     } finally {
       setInviteSending(false);
     }
-  };
-
-  const [interviewerCopied, setInterviewerCopied] = useState(false);
-  const copyInterviewerUrl = () => {
-    if (!shareToken) return;
-    const url = `${window.location.origin}/interviewer/${state.bookId}?token=${shareToken}`;
-    navigator.clipboard.writeText(url).then(() => {
-      setInterviewerCopied(true);
-      setTimeout(() => setInterviewerCopied(false), 2000);
-    });
   };
 
   const coverTemplate = COVER_TEMPLATES.find((t) => t.id === state.coverTemplateId) ?? COVER_TEMPLATES[0];
@@ -369,14 +405,14 @@ export default function BookPage() {
           ))}
         </div>
 
-        {/* 가족 공유 링크 */}
+        {/* 열람 링크 (가족) */}
         {state.bookId && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             {!shareToken ? (
               <button
                 onClick={generateFamilyLink}
                 disabled={familyLoading}
-                title="가족에게만 보이는 비공개 링크 생성"
+                title="가족에게만 보이는 열람 전용 링크 생성"
                 style={{
                   padding: '6px 11px', borderRadius: TOKENS.radiusSm,
                   border: `1px solid ${TOKENS.border}`, background: TOKENS.bg,
@@ -390,6 +426,7 @@ export default function BookPage() {
               <>
                 <button
                   onClick={copyFamilyUrl}
+                  title="열람 전용 링크 복사"
                   style={{
                     padding: '6px 10px', borderRadius: TOKENS.radiusSm,
                     border: `1px solid ${familyCopied ? '#93C5FD' : TOKENS.border}`,
@@ -399,38 +436,12 @@ export default function BookPage() {
                     minHeight: 32, transition: 'all 0.15s', whiteSpace: 'nowrap',
                   }}
                 >
-                  {familyCopied ? '복사됨' : '가족 링크'}
-                </button>
-                <button
-                  onClick={copyInterviewerUrl}
-                  title="가족이 직접 질문할 수 있는 인터뷰어 링크 복사"
-                  style={{
-                    padding: '6px 10px', borderRadius: TOKENS.radiusSm,
-                    border: `1px solid ${interviewerCopied ? '#DDD6FE' : TOKENS.border}`,
-                    background: interviewerCopied ? '#F5F3FF' : TOKENS.bg,
-                    color: interviewerCopied ? '#7C3AED' : TOKENS.subtext,
-                    fontSize: 11, fontFamily: TOKENS.sans, cursor: 'pointer',
-                    minHeight: 32, transition: 'all 0.15s', whiteSpace: 'nowrap',
-                  }}
-                >
-                  {interviewerCopied ? '복사됨' : '인터뷰어'}
-                </button>
-                <button
-                  onClick={() => { setInviteResult(null); setShowInviteModal(true); }}
-                  title="이메일로 초대장 발송"
-                  style={{
-                    padding: '6px 10px', borderRadius: TOKENS.radiusSm,
-                    border: `1px solid ${TOKENS.border}`, background: TOKENS.bg,
-                    color: TOKENS.subtext, fontSize: 11, fontFamily: TOKENS.sans,
-                    cursor: 'pointer', minHeight: 32, whiteSpace: 'nowrap',
-                  }}
-                >
-                  ✉ 초대
+                  {familyCopied ? '복사됨' : '열람 링크'}
                 </button>
                 <button
                   onClick={revokeFamilyLink}
                   disabled={familyLoading}
-                  title="가족 링크 해제"
+                  title="열람 링크 해제"
                   style={{
                     padding: '6px 8px', borderRadius: TOKENS.radiusSm,
                     border: `1px solid ${TOKENS.border}`, background: TOKENS.bg,
@@ -443,6 +454,73 @@ export default function BookPage() {
               </>
             )}
           </div>
+        )}
+
+        {/* 인터뷰어 링크 (질문 권한) */}
+        {state.bookId && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            {!interviewerToken ? (
+              <button
+                onClick={generateInterviewerLink}
+                disabled={interviewerLoading}
+                title="가족이 직접 질문을 추가할 수 있는 인터뷰어 링크 생성"
+                style={{
+                  padding: '6px 11px', borderRadius: TOKENS.radiusSm,
+                  border: `1px solid ${TOKENS.border}`, background: TOKENS.bg,
+                  color: TOKENS.muted, fontSize: 11, fontFamily: TOKENS.sans,
+                  cursor: 'pointer', minHeight: 32, whiteSpace: 'nowrap',
+                }}
+              >
+                {interviewerLoading ? '…' : '인터뷰어 링크'}
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={copyInterviewerUrl}
+                  title="인터뷰어 링크 복사"
+                  style={{
+                    padding: '6px 10px', borderRadius: TOKENS.radiusSm,
+                    border: `1px solid ${interviewerCopied ? '#DDD6FE' : TOKENS.border}`,
+                    background: interviewerCopied ? '#F5F3FF' : TOKENS.bg,
+                    color: interviewerCopied ? '#7C3AED' : TOKENS.subtext,
+                    fontSize: 11, fontFamily: TOKENS.sans, cursor: 'pointer',
+                    minHeight: 32, transition: 'all 0.15s', whiteSpace: 'nowrap',
+                  }}
+                >
+                  {interviewerCopied ? '복사됨' : '인터뷰어 링크'}
+                </button>
+                <button
+                  onClick={revokeInterviewerLink}
+                  disabled={interviewerLoading}
+                  title="인터뷰어 링크 해제"
+                  style={{
+                    padding: '6px 8px', borderRadius: TOKENS.radiusSm,
+                    border: `1px solid ${TOKENS.border}`, background: TOKENS.bg,
+                    color: TOKENS.muted, fontSize: 11, fontFamily: TOKENS.sans,
+                    cursor: 'pointer', minHeight: 32,
+                  }}
+                >
+                  ✕
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* 이메일 초대 버튼 (둘 중 하나라도 링크 있으면 표시) */}
+        {state.bookId && (shareToken || interviewerToken) && (
+          <button
+            onClick={() => { setInviteResult(null); setShowInviteModal(true); }}
+            title="이메일로 초대장 발송"
+            style={{
+              padding: '6px 10px', borderRadius: TOKENS.radiusSm,
+              border: `1px solid ${TOKENS.border}`, background: TOKENS.bg,
+              color: TOKENS.subtext, fontSize: 11, fontFamily: TOKENS.sans,
+              cursor: 'pointer', minHeight: 32, whiteSpace: 'nowrap',
+            }}
+          >
+            ✉ 초대
+          </button>
         )}
 
         <button onClick={handleQuickPrint} style={{
@@ -852,6 +930,18 @@ export default function BookPage() {
               ))}
             </div>
 
+            {/* 토큰 없을 때 경고 */}
+            {inviteType === 'reader' && !shareToken && (
+              <p style={{ fontSize: 12, color: '#92400E', background: '#FFFBEB', padding: '8px 12px', borderRadius: 6, marginBottom: 12, fontFamily: TOKENS.sans }}>
+                열람 링크를 먼저 생성해주세요
+              </p>
+            )}
+            {inviteType === 'interviewer' && !interviewerToken && (
+              <p style={{ fontSize: 12, color: '#5B21B6', background: '#F5F3FF', padding: '8px 12px', borderRadius: 6, marginBottom: 12, fontFamily: TOKENS.sans }}>
+                인터뷰어 링크를 먼저 생성해주세요
+              </p>
+            )}
+
             {/* 이메일 입력 */}
             <label style={{ fontSize: 11, color: TOKENS.muted, fontFamily: TOKENS.sans, letterSpacing: 2, display: 'block', marginBottom: 6 }}>
               받는 사람 이메일
@@ -892,13 +982,13 @@ export default function BookPage() {
               </button>
               <button
                 onClick={sendInviteEmail}
-                disabled={inviteSending || !inviteEmail}
+                disabled={inviteSending || !inviteEmail || (inviteType === 'reader' ? !shareToken : !interviewerToken)}
                 style={{
                   flex: 2, padding: '12px 0',
-                  background: inviteSending || !inviteEmail ? '#D6D3D1' : TOKENS.dark,
+                  background: (inviteSending || !inviteEmail || (inviteType === 'reader' ? !shareToken : !interviewerToken)) ? '#D6D3D1' : TOKENS.dark,
                   color: '#FAFAF9', border: 'none', borderRadius: TOKENS.radiusSm,
                   fontSize: 14, fontFamily: TOKENS.sans, fontWeight: 500,
-                  cursor: inviteSending || !inviteEmail ? 'not-allowed' : 'pointer', minHeight: 48,
+                  cursor: (inviteSending || !inviteEmail || (inviteType === 'reader' ? !shareToken : !interviewerToken)) ? 'not-allowed' : 'pointer', minHeight: 48,
                 }}
               >
                 {inviteSending ? '발송 중…' : '✉ 초대장 보내기'}

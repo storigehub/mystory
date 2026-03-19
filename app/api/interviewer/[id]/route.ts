@@ -18,17 +18,20 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const supabase = createServerClient();
 
-    // 토큰 검증
+    // 토큰 검증 (interviewer_token 우선, share_token 하위 호환)
     const { data: book, error: bookErr } = await supabase
       .from('books')
-      .select('id, share_token')
+      .select('id, share_token, interviewer_token')
       .eq('id', params.id)
       .single();
 
     if (bookErr || !book) {
       return NextResponse.json({ error: '책을 찾을 수 없습니다' }, { status: 404 });
     }
-    if (!book.share_token || book.share_token !== token) {
+    const validToken =
+      (book.interviewer_token && book.interviewer_token === token) ||
+      (!book.interviewer_token && book.share_token && book.share_token === token);
+    if (!validToken) {
       return NextResponse.json({ error: '유효하지 않은 토큰입니다' }, { status: 403 });
     }
 

@@ -6,17 +6,21 @@ type Params = { params: { id: string } };
 
 /**
  * POST /api/books/[id]/share
- * 가족 공유 토큰 생성 (이미 있으면 갱신)
+ * 공유 토큰 생성 (이미 있으면 갱신)
+ * Body: { type?: 'reader' | 'interviewer' }  default: 'reader'
  * 반환: { token: string }
  */
-export async function POST(_req: NextRequest, { params }: Params) {
+export async function POST(req: NextRequest, { params }: Params) {
   try {
     const { userId, error: authError } = await requireAuth();
     if (authError) return authError;
 
+    const body = await req.json().catch(() => ({}));
+    const type: 'reader' | 'interviewer' = body.type === 'interviewer' ? 'interviewer' : 'reader';
+    const field = type === 'interviewer' ? 'interviewer_token' : 'share_token';
+
     const supabase = createServerClient();
 
-    // 소유자 검증
     const { data: book, error: fetchErr } = await supabase
       .from('books')
       .select('user_id')
@@ -34,12 +38,12 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
     const { error } = await supabase
       .from('books')
-      .update({ share_token: token })
+      .update({ [field]: token })
       .eq('id', params.id);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    return NextResponse.json({ token });
+    return NextResponse.json({ token, type });
   } catch (err) {
     const msg = err instanceof Error ? err.message : '서버 오류';
     return NextResponse.json({ error: msg }, { status: 500 });
@@ -47,13 +51,16 @@ export async function POST(_req: NextRequest, { params }: Params) {
 }
 
 /**
- * DELETE /api/books/[id]/share
- * 가족 공유 링크 해제
+ * DELETE /api/books/[id]/share?type=reader|interviewer
+ * 공유 링크 해제
  */
-export async function DELETE(_req: NextRequest, { params }: Params) {
+export async function DELETE(req: NextRequest, { params }: Params) {
   try {
     const { userId, error: authError } = await requireAuth();
     if (authError) return authError;
+
+    const type = req.nextUrl.searchParams.get('type') === 'interviewer' ? 'interviewer' : 'reader';
+    const field = type === 'interviewer' ? 'interviewer_token' : 'share_token';
 
     const supabase = createServerClient();
 
@@ -72,7 +79,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
 
     const { error } = await supabase
       .from('books')
-      .update({ share_token: null })
+      .update({ [field]: null })
       .eq('id', params.id);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
