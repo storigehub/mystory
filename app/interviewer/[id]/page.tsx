@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { TOKENS } from '@/lib/design-tokens';
+import { createBrowserClient } from '@/lib/supabase';
 
 interface Message { id: string; type: string; text: string; sort_order: number; }
 interface Chapter { id: string; title: string; sort_order: number; mode: string; messages: Message[]; }
@@ -63,6 +64,41 @@ export default function InterviewerPage() {
   };
 
   useEffect(() => { load(); }, [bookId, token]); // eslint-disable-line
+
+  // ── Supabase Realtime: 저자 답변 실시간 수신 ──
+  const chaptersRef = useRef<Chapter[]>([]);
+  useEffect(() => { chaptersRef.current = chapters; }, [chapters]);
+
+  useEffect(() => {
+    if (!bookId || !token) return;
+
+    const supabase = createBrowserClient();
+    const channel = supabase
+      .channel(`interviewer-view-${bookId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        (payload) => {
+          const msg = payload.new as { id: string; chapter_id: string; type: string; text: string; sort_order: number };
+          // 인터뷰어 본인이 추가한 메시지는 이미 로컬에 반영되어 있음
+          if (msg.type === 'interviewer') return;
+          // 이 책의 챕터에 속한 메시지인지 확인
+          const chapterExists = chaptersRef.current.some((c) => c.id === msg.chapter_id);
+          if (!chapterExists) return;
+
+          setChapters((prev) =>
+            prev.map((c) =>
+              c.id === msg.chapter_id
+                ? { ...c, messages: [...c.messages, { id: msg.id, type: msg.type, text: msg.text, sort_order: msg.sort_order }] }
+                : c
+            )
+          );
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [bookId, token]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -140,7 +176,7 @@ export default function InterviewerPage() {
         </div>
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 11, color: '#7C3AED', fontFamily: TOKENS.sans, background: '#F5F3FF', padding: '4px 10px', borderRadius: 20, border: '1px solid #DDD6FE' }}>
-          질문을 남기면 저자에게 전달됩니다
+          실시간 연결 중
         </span>
       </div>
 
@@ -272,7 +308,7 @@ export default function InterviewerPage() {
               }}>
                 {sent[activeChapterId] && (
                   <p style={{ fontSize: 12, color: '#7C3AED', fontFamily: TOKENS.sans, margin: 0 }}>
-                    ✓ 질문이 전달됐습니다. 저자가 다음에 대화창을 열면 볼 수 있습니다.
+                    ✓ 질문이 전달됐습니다. 저자가 답변하면 실시간으로 표시됩니다.
                   </p>
                 )}
                 {sendError && (
