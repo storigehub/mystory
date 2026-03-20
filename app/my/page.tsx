@@ -441,11 +441,11 @@ export default function MyPage() {
                 <div
                   key={book.id}
                   style={{
-                    background: '#FFF', borderRadius: 16,
+                    background: '#FFF', borderRadius: 18,
                     border: `1px solid ${TOKENS.borderLight}`,
                     overflow: 'hidden',
-                    boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-                    transition: 'box-shadow 0.2s',
+                    boxShadow: '0 2px 16px rgba(0,0,0,0.07)',
+                    transition: 'box-shadow 0.25s, transform 0.25s',
                   }}
                 >
                   {/* ── 카드 본문 ── */}
@@ -454,11 +454,11 @@ export default function MyPage() {
                     {/* 책 표지 */}
                     <div
                       style={{
-                        width: 88, flexShrink: 0,
+                        width: 96, flexShrink: 0,
                         background: grad,
                         display: 'flex', flexDirection: 'column',
                         alignItems: 'center', justifyContent: 'center',
-                        padding: '20px 8px', minHeight: 144,
+                        padding: '20px 8px', minHeight: 152,
                         position: 'relative', cursor: 'pointer',
                       }}
                       onClick={() => router.push(`/book?id=${book.id}`)}
@@ -513,12 +513,12 @@ export default function MyPage() {
                           {book.chapter_count}개 챕터
                         </span>
                         {book.is_public && (
-                          <span style={{ fontSize: 11, background: '#F0FDF4', color: '#16A34A', borderRadius: 20, padding: '3px 10px', border: '1px solid #BBF7D0' }}>
+                          <span style={{ fontSize: 11, background: '#F2FAF2', color: '#2d7a3a', borderRadius: 20, padding: '3px 10px', border: '1px solid #c3e8c7' }}>
                             공개
                           </span>
                         )}
                         {book.share_token && (
-                          <span style={{ fontSize: 11, background: '#EFF6FF', color: '#1D4ED8', borderRadius: 20, padding: '3px 10px', border: '1px solid #BFDBFE' }}>
+                          <span style={{ fontSize: 11, background: '#FBF7F2', color: TOKENS.accent, borderRadius: 20, padding: '3px 10px', border: `1px solid ${TOKENS.accentBorder}` }}>
                             가족 공유
                           </span>
                         )}
@@ -613,12 +613,13 @@ export default function MyPage() {
                                   {doneCount}/{totalCount} 챕터 완료
                                 </span>
                               </div>
-                              <div style={{ height: 3, background: TOKENS.borderLight, borderRadius: 2 }}>
+                              <div style={{ height: 4, background: TOKENS.borderLight, borderRadius: 4 }}>
                                 <div style={{
                                   height: '100%',
                                   width: totalCount > 0 ? `${(doneCount / totalCount) * 100}%` : '0%',
-                                  background: TOKENS.accent, borderRadius: 2,
-                                  transition: 'width 0.4s ease',
+                                  background: `linear-gradient(90deg, ${TOKENS.accent}, #C9A96E)`,
+                                  borderRadius: 4,
+                                  transition: 'width 0.6s cubic-bezier(0.16,1,0.3,1)',
                                 }} />
                               </div>
                             </div>
