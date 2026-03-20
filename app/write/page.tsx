@@ -170,83 +170,85 @@ export default function WritePage() {
       )}
 
       {/* Header */}
-      <div style={{ flexShrink: 0, background: TOKENS.bg, borderBottom: `1px solid ${TOKENS.borderLight}` }}>
-        <div style={{ display: 'flex', alignItems: 'center', padding: '8px 10px 2px', gap: 6 }}>
+      <div style={{ flexShrink: 0, background: '#FAFAF8', borderBottom: `1px solid ${TOKENS.borderLight}` }}>
+        {/* 상단 진행 바 */}
+        <div style={{ height: 2, background: TOKENS.borderLight }}>
+          <div style={{
+            height: '100%', width: `${progress}%`,
+            background: `linear-gradient(90deg, ${TOKENS.accent}, #C9A96E)`,
+            transition: 'width 0.6s cubic-bezier(0.16,1,0.3,1)',
+          }} />
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', padding: '10px 12px 4px', gap: 8 }}>
           <button
             onClick={() => setShowSidebar(true)}
             style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              color: TOKENS.subtext,
-              padding: 6,
-              minWidth: 44,
-              minHeight: 44,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: TOKENS.subtext, padding: 6, minWidth: 44, minHeight: 44,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              borderRadius: 8, transition: 'background 0.15s',
             }}
             aria-label="목차 열기"
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = TOKENS.warm; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; }}
           >
-            <svg width="20" height="16" viewBox="0 0 20 16" fill="none">
-              <path d="M1 1h18M1 8h18M1 15h18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
+              <path d="M1 1h16M1 7h16M1 13h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
           </button>
 
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <div style={{
+              fontSize: 15, fontFamily: TOKENS.serif, fontWeight: 400,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              letterSpacing: '-0.01em', color: TOKENS.text,
+            }}>
               {currentChapter.title}
             </div>
-            <div style={{ fontSize: 11, color: TOKENS.muted, fontFamily: TOKENS.sans }}>
-              {String(state.currentChapterIdx + 1).padStart(2, '0')} / {String(state.chapters.length).padStart(2, '0')} · 전체 {progress}%
+            <div style={{ fontSize: 11, color: TOKENS.muted, fontFamily: TOKENS.sans, marginTop: 1 }}>
+              {String(state.currentChapterIdx + 1).padStart(2, '0')} / {String(state.chapters.length).padStart(2, '0')}
+              <span style={{ margin: '0 5px', opacity: 0.4 }}>·</span>
+              {progress}% 완료
             </div>
           </div>
 
           <button
             onClick={() => setShowFinish(true)}
             style={{
-              background: TOKENS.dark,
-              color: '#FAFAF9',
-              border: 'none',
-              borderRadius: TOKENS.radiusSm,
-              padding: '9px 16px',
-              fontSize: 13,
-              cursor: 'pointer',
-              fontFamily: TOKENS.sans,
-              fontWeight: 500,
-              whiteSpace: 'nowrap',
-              flexShrink: 0,
-              minHeight: 40,
+              background: TOKENS.dark, color: '#FAFAF9', border: 'none',
+              borderRadius: 40, padding: '9px 18px', fontSize: 13,
+              cursor: 'pointer', fontFamily: TOKENS.sans, fontWeight: 500,
+              whiteSpace: 'nowrap', flexShrink: 0,
+              boxShadow: '0 2px 10px rgba(26,24,22,0.15)',
+              transition: 'transform 0.15s, box-shadow 0.15s',
             }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = 'none'; }}
           >
             {state.currentChapterIdx < state.chapters.length - 1 ? '다음 장 →' : '완성하기'}
           </button>
         </div>
 
-        {/* Mode tab */}
+        {/* Mode 탭 */}
         <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 16px 10px' }}>
-          <div style={{ display: 'flex', gap: 2, padding: 3, background: TOKENS.warm, borderRadius: 8, minWidth: 170 }}>
+          <div style={{
+            display: 'flex', gap: 2, padding: 3,
+            background: TOKENS.warm, borderRadius: 10,
+            border: `1px solid ${TOKENS.borderLight}`,
+          }}>
             {(['chat', 'normal'] as const).map((m) => {
               const isActive = mode === m;
               return (
-                <button
-                  key={m}
-                  onClick={() => handleSetMode(m)}
-                  style={{
-                    flex: 1,
-                    padding: '8px 0',
-                    border: 'none',
-                    fontSize: 13,
-                    fontWeight: isActive ? 600 : 400,
-                    cursor: 'pointer',
-                    fontFamily: TOKENS.sans,
-                    borderRadius: TOKENS.radiusSm,
-                    background: isActive ? TOKENS.card : 'transparent',
-                    color: isActive ? TOKENS.text : TOKENS.muted,
-                    boxShadow: isActive ? TOKENS.shadowSm : 'none',
-                    minHeight: 36,
-                  }}
-                >
+                <button key={m} onClick={() => handleSetMode(m)} style={{
+                  padding: '8px 20px', border: 'none', fontSize: 13,
+                  fontWeight: isActive ? 500 : 400, cursor: 'pointer',
+                  fontFamily: TOKENS.sans, borderRadius: 8,
+                  background: isActive ? '#FFF' : 'transparent',
+                  color: isActive ? TOKENS.text : TOKENS.muted,
+                  boxShadow: isActive ? '0 1px 6px rgba(0,0,0,0.08)' : 'none',
+                  minHeight: 34, transition: 'all 0.18s',
+                }}>
                   {m === 'chat' ? '대화 모드' : '일반 모드'}
                 </button>
               );
@@ -257,55 +259,40 @@ export default function WritePage() {
 
       {/* Finish modal */}
       {showFinish && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 200,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'rgba(0,0,0,.3)',
-            padding: 20,
-          }}
-        >
-          <div
-            style={{
-              background: TOKENS.card,
-              borderRadius: 12,
-              padding: '28px 24px',
-              maxWidth: 340,
-              width: '100%',
-              boxShadow: TOKENS.shadowLg,
-              textAlign: 'center',
-            }}
-          >
-            <h3 style={{ fontSize: 17, fontWeight: 500, marginBottom: 8 }}>이 주제를 마칠까요?</h3>
-            <p style={{ fontSize: 14, color: TOKENS.subtext, lineHeight: 1.7, marginBottom: 20, fontFamily: TOKENS.sans }}>
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          background: 'rgba(26,24,22,0.5)', backdropFilter: 'blur(4px)',
+        }} onClick={(e) => { if (e.target === e.currentTarget) setShowFinish(false); }}>
+          <div style={{
+            background: '#FFF', borderRadius: '20px 20px 0 0',
+            padding: '32px 28px max(32px, env(safe-area-inset-bottom))',
+            width: '100%', maxWidth: 480,
+            boxShadow: '0 -8px 40px rgba(0,0,0,0.12)',
+            animation: 'fadeUp 0.3s cubic-bezier(0.16,1,0.3,1)',
+          }}>
+            <div style={{ width: 36, height: 3, background: TOKENS.border, borderRadius: 2, margin: '0 auto 28px' }} />
+            <h3 style={{
+              fontFamily: TOKENS.serif, fontSize: 20, fontWeight: 300,
+              marginBottom: 10, letterSpacing: '-0.025em', color: TOKENS.text,
+            }}>이 주제를 마칠까요?</h3>
+            <p style={{ fontSize: 14, color: TOKENS.subtext, lineHeight: 1.75, marginBottom: 24, fontFamily: TOKENS.sans, wordBreak: 'keep-all' }}>
               "{currentChapter.title}" 작성을 마치고{' '}
-              {state.currentChapterIdx < state.chapters.length - 1 ? '다음 주제로 넘어갑니다.' : '책을 완성합니다.'}
-              <br />
+              {state.currentChapterIdx < state.chapters.length - 1 ? '다음 주제로 넘어갑니다.' : '책을 완성합니다.'}<br />
               나중에 다시 돌아와 수정할 수 있습니다.
             </p>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                onClick={() => setShowFinish(false)}
-                style={{
-                  flex: 1, padding: 14, border: `1px solid ${TOKENS.border}`,
-                  borderRadius: TOKENS.radiusSm, background: TOKENS.card,
-                  fontSize: 14, fontFamily: TOKENS.sans, cursor: 'pointer', minHeight: 48,
-                }}
-              >
-                더 작성하기
-              </button>
-              <button
-                onClick={handleFinish}
-                style={{
-                  flex: 1, padding: 14, border: 'none',
-                  borderRadius: TOKENS.radiusSm, background: TOKENS.dark, color: '#FAFAF9',
-                  fontSize: 14, fontFamily: TOKENS.sans, fontWeight: 500, cursor: 'pointer', minHeight: 48,
-                }}
-              >
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setShowFinish(false)} style={{
+                flex: 1, padding: '14px 0', border: `1px solid ${TOKENS.border}`,
+                borderRadius: 12, background: TOKENS.warm, fontSize: 14,
+                fontFamily: TOKENS.sans, cursor: 'pointer', color: TOKENS.subtext,
+              }}>더 작성하기</button>
+              <button onClick={handleFinish} style={{
+                flex: 1, padding: '14px 0', border: 'none', borderRadius: 12,
+                background: TOKENS.dark, color: '#FAFAF9', fontSize: 14,
+                fontFamily: TOKENS.sans, fontWeight: 500, cursor: 'pointer',
+                boxShadow: '0 4px 16px rgba(26,24,22,0.2)',
+              }}>
                 {state.currentChapterIdx < state.chapters.length - 1 ? '다음 장으로' : '완성하기'}
               </button>
             </div>
@@ -316,179 +303,151 @@ export default function WritePage() {
       {/* Sidebar */}
       {showSidebar && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex' }}>
-          <div
-            style={{
-              width: 'min(300px, 85vw)',
-              background: TOKENS.card,
-              height: '100%',
-              boxShadow: '4px 0 24px rgba(0,0,0,.08)',
-              padding: '24px 16px',
-              overflowY: 'auto',
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-          >
-            <label style={{ display: 'block', fontSize: 11, color: TOKENS.muted, marginBottom: 6, fontFamily: TOKENS.sans, letterSpacing: 2 }}>
-              목차
-            </label>
-            <h3 style={{ fontSize: 16, fontWeight: 400, margin: '4px 0 6px' }}>전체 진행</h3>
-
-            <div style={{ height: 6, background: TOKENS.borderLight, borderRadius: 3, marginBottom: 12, overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${progress}%`, background: TOKENS.accent, borderRadius: 3, transition: 'width .3s' }} />
+          <div style={{
+            width: 'min(300px, 85vw)', background: '#FAFAF8',
+            height: '100%', boxShadow: '6px 0 32px rgba(0,0,0,0.1)',
+            padding: '0', overflowY: 'auto', display: 'flex', flexDirection: 'column',
+            borderRight: `1px solid ${TOKENS.borderLight}`,
+          }}>
+            {/* 사이드바 헤더 */}
+            <div style={{ padding: '20px 20px 16px', borderBottom: `1px solid ${TOKENS.borderLight}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <p style={{ fontSize: 9, letterSpacing: 3, color: TOKENS.accent, textTransform: 'uppercase', fontFamily: TOKENS.sans, fontWeight: 600 }}>
+                  Table of Contents
+                </p>
+                <button onClick={() => setShowSidebar(false)} style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: TOKENS.muted, fontSize: 18, lineHeight: 1, padding: '2px 4px',
+                }}>×</button>
+              </div>
+              {/* 진행률 */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontSize: 12, color: TOKENS.muted, fontFamily: TOKENS.sans }}>전체 진행</span>
+                <span style={{ fontSize: 12, color: TOKENS.accent, fontFamily: TOKENS.sans, fontWeight: 500 }}>
+                  {doneCount}/{state.chapters.length} 완료
+                </span>
+              </div>
+              <div style={{ height: 4, background: TOKENS.borderLight, borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%', width: `${progress}%`,
+                  background: `linear-gradient(90deg, ${TOKENS.accent}, #C9A96E)`,
+                  borderRadius: 4, transition: 'width 0.5s ease',
+                }} />
+              </div>
             </div>
-            <p style={{ fontSize: 12, color: TOKENS.muted, fontFamily: TOKENS.sans, marginBottom: 14 }}>
-              {state.chapters.length}개 중 {doneCount}개 완료 ({progress}%)
-            </p>
 
-            <div style={{ flex: 1, overflowY: 'auto' }}>
+            {/* 챕터 목록 */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
               {state.chapters.map((ch, i) => (
-                <button
-                  key={ch.id}
-                  onClick={() => { setCurrentChapterIdx(i); setShowSidebar(false); }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                    padding: '12px',
-                    border: i === state.currentChapterIdx ? `1.5px solid ${TOKENS.dark}` : `1px solid ${TOKENS.borderLight}`,
-                    borderRadius: TOKENS.radiusSm,
-                    background: ch.done ? '#F0F9F0' : TOKENS.card,
-                    cursor: 'pointer', marginBottom: 5, fontFamily: TOKENS.sans, fontSize: 14, textAlign: 'left', minHeight: 48,
-                  }}
-                >
-                  <span style={{ fontSize: 11, color: TOKENS.muted, fontWeight: 600, minWidth: 20 }}>{String(i + 1).padStart(2, '0')}</span>
-                  <span style={{ flex: 1, color: ch.done ? '#166534' : TOKENS.text }}>{ch.title}</span>
-                  {ch.done && <span style={{ fontSize: 11, color: '#166534', fontWeight: 600 }}>완료</span>}
+                <button key={ch.id} onClick={() => { setCurrentChapterIdx(i); setShowSidebar(false); }} style={{
+                  display: 'flex', alignItems: 'center', gap: 12, width: '100%',
+                  padding: '11px 12px',
+                  border: i === state.currentChapterIdx
+                    ? `1.5px solid ${TOKENS.accent}`
+                    : `1px solid transparent`,
+                  borderRadius: 10,
+                  background: i === state.currentChapterIdx
+                    ? '#FBF7F2'
+                    : ch.done ? '#F7FDF7' : 'transparent',
+                  cursor: 'pointer', marginBottom: 3, fontFamily: TOKENS.sans,
+                  fontSize: 13.5, textAlign: 'left', minHeight: 44,
+                  transition: 'background 0.15s, border-color 0.15s',
+                }}>
+                  <span style={{
+                    fontSize: 10, fontWeight: 600, minWidth: 22,
+                    color: i === state.currentChapterIdx ? TOKENS.accent : TOKENS.muted,
+                    fontFamily: TOKENS.sans,
+                  }}>{String(i + 1).padStart(2, '0')}</span>
+                  <span style={{ flex: 1, color: ch.done ? '#2d7a3a' : TOKENS.text, lineHeight: 1.4 }}>{ch.title}</span>
+                  {ch.done && (
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <circle cx="7" cy="7" r="6" fill="#e8f5e9"/>
+                      <path d="M4 7l2 2 4-4" stroke="#2d7a3a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
                 </button>
               ))}
             </div>
 
-            {/* Font size settings */}
-            <div style={{ borderTop: `1px solid ${TOKENS.borderLight}`, paddingTop: 16, marginTop: 12 }}>
-              <label style={{ display: 'block', fontSize: 11, color: TOKENS.muted, marginBottom: 6, fontFamily: TOKENS.sans, letterSpacing: 2 }}>
-                글자 크기
-              </label>
-              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+            {/* 글자 크기 */}
+            <div style={{ padding: '14px 20px', borderTop: `1px solid ${TOKENS.borderLight}` }}>
+              <p style={{ fontSize: 9, letterSpacing: 2.5, color: TOKENS.muted, textTransform: 'uppercase', fontFamily: TOKENS.sans, marginBottom: 10 }}>글자 크기</p>
+              <div style={{ display: 'flex', gap: 6 }}>
                 {Object.entries(FONT_SIZE_PRESETS).map(([key, preset]) => {
                   const isActive = state.fontSize === key;
                   return (
-                    <button
-                      key={key}
-                      onClick={() => setFontSize(key as 'normal' | 'large')}
-                      style={{
-                        flex: 1, padding: '10px 0',
-                        border: `1.5px solid ${isActive ? TOKENS.dark : TOKENS.border}`,
-                        borderRadius: TOKENS.radiusSm,
-                        background: isActive ? TOKENS.dark : TOKENS.card,
-                        color: isActive ? '#FAFAF9' : TOKENS.text,
-                        cursor: 'pointer', fontFamily: TOKENS.sans, fontSize: 13, fontWeight: isActive ? 600 : 400,
-                        minHeight: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-                      }}
-                    >
-                      <span style={{ fontSize: key === 'large' ? 17 : 13, fontWeight: 600, lineHeight: 1 }}>가</span>
-                      <span style={{ fontSize: 10, opacity: 0.7 }}>{preset.label}</span>
+                    <button key={key} onClick={() => setFontSize(key as 'normal' | 'large')} style={{
+                      flex: 1, padding: '10px 0',
+                      border: `1.5px solid ${isActive ? TOKENS.accent : TOKENS.border}`,
+                      borderRadius: 10,
+                      background: isActive ? '#FBF7F2' : '#FFF',
+                      color: isActive ? TOKENS.accent : TOKENS.subtext,
+                      cursor: 'pointer', fontFamily: TOKENS.sans, fontSize: 12,
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                      transition: 'all 0.15s',
+                    }}>
+                      <span style={{ fontSize: key === 'large' ? 18 : 14, fontWeight: 500, lineHeight: 1 }}>가</span>
+                      <span style={{ fontSize: 10 }}>{preset.label}</span>
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* 동기화 상태 */}
-            <div
-              style={{
-                borderTop: `1px solid ${TOKENS.borderLight}`,
-                paddingTop: 14,
-                marginTop: 14,
-              }}
-            >
+            {/* 동기화 + 액션 */}
+            <div style={{ padding: '14px 20px 20px', borderTop: `1px solid ${TOKENS.borderLight}` }}>
               {session ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  <div
-                    style={{
-                      width: 8, height: 8, borderRadius: '50%',
-                      background: isSyncing ? '#F59E0B' : syncError ? '#EF4444' : '#22C55E',
-                      flexShrink: 0,
-                    }}
-                  />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <div style={{
+                    width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                    background: isSyncing ? '#F59E0B' : syncError ? '#EF4444' : '#22C55E',
+                  }} />
                   <span style={{ fontSize: 12, color: TOKENS.muted, fontFamily: TOKENS.sans }}>
-                    {isSyncing ? '동기화 중...' : syncError ? '동기화 오류' : '저장됨'}
+                    {isSyncing ? '동기화 중…' : syncError ? '동기화 오류' : '저장됨'}
                   </span>
                   {!isSyncing && (
-                    <button
-                      onClick={syncToDb}
-                      style={{
-                        marginLeft: 'auto', background: 'none', border: 'none',
-                        cursor: 'pointer', color: TOKENS.accent, fontSize: 12,
-                        fontFamily: TOKENS.sans, padding: '2px 6px',
-                      }}
-                    >
-                      수동 저장
-                    </button>
+                    <button onClick={syncToDb} style={{
+                      marginLeft: 'auto', background: 'none', border: 'none',
+                      cursor: 'pointer', color: TOKENS.accent, fontSize: 12,
+                      fontFamily: TOKENS.sans, padding: '2px 6px',
+                    }}>수동 저장</button>
                   )}
                 </div>
               ) : (
-                <button
-                  onClick={() => signIn(undefined, { callbackUrl: '/write' })}
-                  style={{
-                    width: '100%', padding: '10px 0',
-                    border: `1px solid ${TOKENS.accentBorder}`,
-                    borderRadius: TOKENS.radiusSm, background: 'transparent',
-                    color: TOKENS.accent, fontSize: 13,
+                <button onClick={() => signIn(undefined, { callbackUrl: '/write' })} style={{
+                  width: '100%', padding: '11px 0', marginBottom: 10,
+                  border: `1px solid ${TOKENS.accentBorder}`, borderRadius: 10,
+                  background: '#FBF7F2', color: TOKENS.accent, fontSize: 13,
+                  fontFamily: TOKENS.sans, cursor: 'pointer',
+                }}>클라우드 저장을 위해 로그인</button>
+              )}
+
+              <button onClick={() => router.push('/book')} style={{
+                width: '100%', padding: '13px 0', background: TOKENS.dark, color: '#FAFAF9',
+                border: 'none', borderRadius: 10, cursor: 'pointer',
+                fontFamily: TOKENS.sans, fontWeight: 500, fontSize: 14,
+                boxShadow: '0 3px 12px rgba(26,24,22,0.18)', marginBottom: 8,
+              }}>책 미리보기</button>
+
+              {session && (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => { setShowSidebar(false); router.push('/my'); }} style={{
+                    flex: 1, padding: '11px 0',
+                    border: `1px solid ${TOKENS.border}`, borderRadius: 10,
+                    background: '#FFF', color: TOKENS.text, fontSize: 13,
                     fontFamily: TOKENS.sans, cursor: 'pointer',
-                    marginBottom: 8, minHeight: 40,
-                  }}
-                >
-                  ☁️ 로그인하고 클라우드 저장
-                </button>
+                  }}>{session.user?.name?.split(' ')[0] || '내 책'}</button>
+                  <button onClick={async () => { resetBook(); await signOut({ callbackUrl: '/' }); }} style={{
+                    flex: 1, padding: '11px 0',
+                    border: 'none', borderRadius: 10,
+                    background: TOKENS.warm, color: TOKENS.muted, fontSize: 13,
+                    fontFamily: TOKENS.sans, cursor: 'pointer',
+                  }}>로그아웃</button>
+                </div>
               )}
             </div>
-
-            <button
-              onClick={() => router.push('/book')}
-              style={{
-                width: '100%', padding: 14, background: TOKENS.dark, color: '#FAFAF9',
-                border: 'none', borderRadius: TOKENS.radiusSm, marginTop: 6,
-                cursor: 'pointer', fontFamily: TOKENS.sans, fontWeight: 500, fontSize: 14, minHeight: 48,
-              }}
-            >
-              책 미리보기
-            </button>
-
-            {/* 로그인 시: 내 정보 + 로그아웃 */}
-            {session && (
-              <div style={{ borderTop: `1px solid ${TOKENS.borderLight}`, paddingTop: 12, marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <button
-                  onClick={() => { setShowSidebar(false); router.push('/my'); }}
-                  style={{
-                    width: '100%', padding: '12px 0',
-                    border: `1px solid ${TOKENS.border}`,
-                    borderRadius: TOKENS.radiusSm,
-                    background: TOKENS.card,
-                    color: TOKENS.text,
-                    fontSize: 14, fontFamily: TOKENS.sans, cursor: 'pointer', minHeight: 48,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  }}
-                >
-                  👤 {session.user?.name || '내 정보'}
-                </button>
-                <button
-                  onClick={async () => {
-                    resetBook();
-                    await signOut({ callbackUrl: '/' });
-                  }}
-                  style={{
-                    width: '100%', padding: '12px 0',
-                    border: 'none',
-                    borderRadius: TOKENS.radiusSm,
-                    background: '#f5ede3',
-                    color: '#8c7a6a',
-                    fontSize: 14, fontFamily: TOKENS.sans, cursor: 'pointer', minHeight: 48,
-                  }}
-                >
-                  로그아웃
-                </button>
-              </div>
-            )}
           </div>
-          <div onClick={() => setShowSidebar(false)} style={{ flex: 1, background: 'rgba(0,0,0,.25)' }} />
+          <div onClick={() => setShowSidebar(false)} style={{ flex: 1, background: 'rgba(26,24,22,0.3)', backdropFilter: 'blur(2px)' }} />
         </div>
       )}
 

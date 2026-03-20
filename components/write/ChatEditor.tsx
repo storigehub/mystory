@@ -71,42 +71,26 @@ function PhotoIcon() {
 
 function TypingIndicator() {
   return (
-    <div style={{ display: 'flex', gap: 8 }}>
-      <div
-        style={{
-          width: 32,
-          height: 32,
-          borderRadius: '50%',
-          background: TOKENS.dark,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#fff',
-          flexShrink: 0,
-        }}
-      >
+    <div style={{ display: 'flex', gap: 10 }}>
+      <div style={{
+        width: 34, height: 34, borderRadius: '50%',
+        background: '#1A1816', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', color: '#fff', flexShrink: 0,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+      }}>
         <AIIcon />
       </div>
-      <div
-        style={{
-          background: TOKENS.card,
-          borderRadius: '3px 16px 16px 16px',
-          padding: '12px 18px',
-          boxShadow: TOKENS.shadowSm,
-        }}
-      >
+      <div style={{
+        background: '#FFF', borderRadius: '4px 18px 18px 18px',
+        padding: '13px 18px', boxShadow: '0 2px 10px rgba(0,0,0,0.07)',
+        border: `1px solid ${TOKENS.borderLight}`,
+      }}>
         <div style={{ display: 'flex', gap: 5, height: 18, alignItems: 'center' }}>
           {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                background: TOKENS.muted,
-                animation: `dot 1.2s ${i * 0.15}s infinite`,
-              }}
-            />
+            <div key={i} style={{
+              width: 6, height: 6, borderRadius: '50%', background: TOKENS.muted,
+              animation: `dot 1.2s ${i * 0.15}s infinite`,
+            }} />
           ))}
         </div>
       </div>
@@ -402,84 +386,68 @@ export default function ChatEditor({ chapter, chapterIdx, maxDurationSec = 120 }
   return (
     <>
       {/* Message list */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '12px 12px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 10,
-          overscrollBehavior: 'contain',
-        }}
-      >
-        {/* Question progress */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 4px 8px' }}>
-          <span style={{ fontSize: 12, color: TOKENS.muted, fontFamily: TOKENS.sans, whiteSpace: 'nowrap' }}>
-            질문 {answeredQ}/{questions.length}
+      <div style={{
+        flex: 1, overflowY: 'auto', padding: '16px 14px',
+        display: 'flex', flexDirection: 'column', gap: 12,
+        overscrollBehavior: 'contain',
+      }}>
+        {/* 질문 진행 */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '6px 2px 10px',
+        }}>
+          <span style={{ fontSize: 11, color: TOKENS.muted, fontFamily: TOKENS.sans, whiteSpace: 'nowrap', letterSpacing: 0.3 }}>
+            질문 {answeredQ} / {questions.length}
           </span>
-          <div
-            style={{
-              flex: 1,
-              height: 4,
-              background: TOKENS.borderLight,
-              borderRadius: 2,
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                height: '100%',
-                width: `${Math.min((answeredQ / questions.length) * 100, 100)}%`,
-                background: TOKENS.accent,
-                borderRadius: 2,
-                transition: 'width .3s',
-              }}
-            />
+          <div style={{ flex: 1, height: 3, background: TOKENS.borderLight, borderRadius: 3, overflow: 'hidden' }}>
+            <div style={{
+              height: '100%',
+              width: `${Math.min((answeredQ / questions.length) * 100, 100)}%`,
+              background: `linear-gradient(90deg, ${TOKENS.accent}, #C9A96E)`,
+              borderRadius: 3, transition: 'width 0.5s ease',
+            }} />
           </div>
         </div>
 
         {/* Messages */}
         {chapter.messages.map((msg) => (
-          <div
-            key={msg.id}
-            style={{
-              display: 'flex',
-              justifyContent: msg.type === 'user' || msg.type === 'photo' ? 'flex-end' : 'flex-start',
-              animation: 'fadeIn .3s ease',
-            }}
-          >
+          <div key={msg.id} style={{
+            display: 'flex',
+            justifyContent: msg.type === 'user' || msg.type === 'photo' ? 'flex-end' : 'flex-start',
+            animation: 'fadeIn .3s ease',
+          }}>
             {msg.type === 'assistant' && (
-              <div style={{ display: 'flex', gap: 8, maxWidth: '85%' }}>
-                <div
-                  title={msg.source === 'interviewer' ? '인터뷰어 질문' : 'AI 질문'}
-                  style={{
-                    width: 32, height: 32, borderRadius: '50%',
-                    background: msg.source === 'interviewer' ? '#7C3AED' : TOKENS.dark,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    flexShrink: 0, color: '#fff',
-                  }}
-                >
+              <div style={{ display: 'flex', gap: 10, maxWidth: '86%' }}>
+                {/* 아바타 */}
+                <div title={msg.source === 'interviewer' ? '인터뷰어 질문' : 'AI 질문'} style={{
+                  width: 34, height: 34, borderRadius: '50%',
+                  background: msg.source === 'interviewer' ? '#6D28D9' : '#1A1816',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0, color: '#fff',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                }}>
                   {msg.source === 'interviewer' ? <PersonIcon /> : <AIIcon />}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   {msg.source === 'interviewer' && (
-                    <span style={{ fontSize: 10, color: '#7C3AED', fontFamily: TOKENS.sans, letterSpacing: 1 }}>
-                      인터뷰어
+                    <span style={{ fontSize: 10, color: '#6D28D9', fontFamily: TOKENS.sans, letterSpacing: 1, fontWeight: 600 }}>
+                      INTERVIEWER
                     </span>
                   )}
-                  <div
-                    style={{
-                      background: msg.source === 'interviewer' ? '#F5F3FF' : TOKENS.card,
-                      borderRadius: '3px 16px 16px 16px',
-                      padding: '12px 14px',
-                      fontSize: fontPreset.chat,
-                      lineHeight: 1.8,
-                      boxShadow: TOKENS.shadowSm,
-                      whiteSpace: 'pre-wrap',
-                      border: msg.source === 'interviewer' ? '1px solid #DDD6FE' : 'none',
-                    }}
-                  >
+                  <div style={{
+                    background: msg.source === 'interviewer' ? '#F3F0FF' : '#FFF',
+                    borderRadius: '4px 18px 18px 18px',
+                    padding: '13px 16px',
+                    fontSize: fontPreset.chat,
+                    lineHeight: 1.85,
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.07)',
+                    whiteSpace: 'pre-wrap',
+                    border: msg.source === 'interviewer'
+                      ? '1px solid #DDD6FE'
+                      : `1px solid ${TOKENS.borderLight}`,
+                    fontFamily: TOKENS.serif,
+                    color: TOKENS.text,
+                  }}>
                     {msg.text}
                   </div>
                 </div>
@@ -487,31 +455,28 @@ export default function ChatEditor({ chapter, chapterIdx, maxDurationSec = 120 }
             )}
 
             {msg.type === 'user' && (
-              <div
-                style={{
-                  background: TOKENS.dark,
-                  borderRadius: '16px 3px 16px 16px',
-                  padding: '12px 14px',
-                  maxWidth: '80%',
-                  fontSize: fontPreset.chat,
-                  lineHeight: 1.8,
-                  whiteSpace: 'pre-wrap',
-                  color: '#FAFAF9',
-                }}
-              >
+              <div style={{
+                background: '#1A1816',
+                borderRadius: '18px 4px 18px 18px',
+                padding: '13px 16px',
+                maxWidth: '80%',
+                fontSize: fontPreset.chat,
+                lineHeight: 1.85,
+                whiteSpace: 'pre-wrap',
+                color: '#FAFAF9',
+                fontFamily: TOKENS.serif,
+                boxShadow: '0 3px 12px rgba(26,24,22,0.2)',
+              }}>
                 {msg.text}
               </div>
             )}
 
             {msg.type === 'photo' && (
-              <div
-                style={{
-                  borderRadius: '16px 3px 16px 16px',
-                  overflow: 'hidden',
-                  maxWidth: '70%',
-                  boxShadow: TOKENS.shadowLg,
-                }}
-              >
+              <div style={{
+                borderRadius: '18px 4px 18px 18px',
+                overflow: 'hidden', maxWidth: '70%',
+                boxShadow: '0 6px 24px rgba(0,0,0,0.18)',
+              }}>
                 <img src={msg.text} alt="첨부 사진" style={{ width: '100%', display: 'block' }} />
               </div>
             )}
@@ -524,65 +489,38 @@ export default function ChatEditor({ chapter, chapterIdx, maxDurationSec = 120 }
         <div ref={endRef} />
       </div>
 
-      {/* "More" + "이야기 완성하기" buttons */}
+      {/* 액션 버튼 바 */}
       {!isTyping && userMsgCount > 0 && (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            gap: 8,
-            padding: '6px 12px',
-            borderTop: `1px solid ${TOKENS.borderLight}`,
-            background: TOKENS.bg,
-            flexShrink: 0,
-            flexWrap: 'wrap',
-          }}
-        >
-          <button
-            onClick={() => setDeepMode(true)}
-            style={{
-              padding: '8px 16px',
-              border: `1px solid ${deepMode ? TOKENS.accent : TOKENS.border}`,
-              borderRadius: 20,
-              background: deepMode ? TOKENS.accentBg : TOKENS.card,
-              color: deepMode ? TOKENS.accent : TOKENS.subtext,
-              fontSize: 13,
-              fontFamily: TOKENS.sans,
-              cursor: 'pointer',
-              minHeight: 36,
-            }}
-          >
-            {deepMode ? '추가 이야기 입력 중...' : '이 질문에 더 이야기하기'}
+        <div style={{
+          display: 'flex', justifyContent: 'center', gap: 8,
+          padding: '8px 14px', borderTop: `1px solid ${TOKENS.borderLight}`,
+          background: '#FAFAF8', flexShrink: 0, flexWrap: 'wrap',
+        }}>
+          <button onClick={() => setDeepMode(true)} style={{
+            padding: '8px 18px',
+            border: `1px solid ${deepMode ? TOKENS.accent : TOKENS.border}`,
+            borderRadius: 40,
+            background: deepMode ? '#FBF7F2' : '#FFF',
+            color: deepMode ? TOKENS.accent : TOKENS.subtext,
+            fontSize: 12.5, fontFamily: TOKENS.sans, cursor: 'pointer',
+            transition: 'all 0.15s',
+          }}>
+            {deepMode ? '추가 이야기 입력 중…' : '이 질문에 더 이야기하기'}
           </button>
 
-          {/* 이야기 완성하기 버튼 (3개 이상 답변 시 활성화) */}
           {userMsgCount >= 3 && (
-            <button
-              onClick={handleAssemble}
-              disabled={isAssembling}
-              style={{
-                padding: '8px 16px',
-                border: `1px solid ${TOKENS.dark}`,
-                borderRadius: 20,
-                background: isAssembling ? TOKENS.borderLight : TOKENS.dark,
-                color: isAssembling ? TOKENS.muted : '#FAFAF9',
-                fontSize: 13,
-                fontFamily: TOKENS.sans,
-                cursor: isAssembling ? 'wait' : 'pointer',
-                minHeight: 36,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-              }}
-            >
-              {isAssembling ? (
-                <>
-                  <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⏳</span>
-                  이야기 정리 중...
-                </>
-              ) : (
-                '✍️ 이야기 완성하기'
-              )}
+            <button onClick={handleAssemble} disabled={isAssembling} style={{
+              padding: '8px 18px',
+              border: `1px solid ${isAssembling ? TOKENS.border : '#1A1816'}`,
+              borderRadius: 40,
+              background: isAssembling ? TOKENS.warm : '#1A1816',
+              color: isAssembling ? TOKENS.muted : '#FAFAF9',
+              fontSize: 12.5, fontFamily: TOKENS.sans,
+              cursor: isAssembling ? 'wait' : 'pointer',
+              display: 'flex', alignItems: 'center', gap: 6,
+              transition: 'all 0.15s',
+            }}>
+              {isAssembling ? '이야기 정리 중…' : '이야기 완성하기'}
             </button>
           )}
         </div>
