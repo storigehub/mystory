@@ -817,7 +817,7 @@ export default function BookPage() {
             style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 150, backdropFilter: 'blur(2px)' }}
           />
           {/* 드로어 */}
-          <div style={{
+          <div className="share-drawer" style={{
             position: 'fixed', top: 0, right: 0, bottom: 0, zIndex: 160,
             width: 'min(380px, 92vw)',
             background: TOKENS.card,

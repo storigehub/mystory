@@ -68,8 +68,62 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
   .scenario-asymmetric>div:first-child{grid-row:auto!important}
 }
 
+/* ── 인터뷰어 레이아웃 모바일 ── */
+@media(max-width:639px){
+  /* 세로 레이아웃: 사이드바 → 상단 칩 바 */
+  .interviewer-layout{flex-direction:column!important}
+  .interviewer-sidebar{
+    width:100%!important;height:auto!important;
+    flex-direction:row!important;overflow-x:auto!important;overflow-y:hidden!important;
+    border-right:none!important;border-bottom:1px solid #F0EEEA!important;
+    padding:10px 12px!important;gap:6px!important;
+    scrollbar-width:none!important;-ms-overflow-style:none!important;
+  }
+  .interviewer-sidebar::-webkit-scrollbar{display:none}
+  .interviewer-sidebar-label{display:none!important}
+  .interviewer-chip{
+    flex-shrink:0!important;white-space:nowrap!important;
+    padding:7px 14px!important;border-radius:20px!important;
+    width:auto!important;flex-direction:row!important;
+    min-height:36px!important;
+  }
+  /* 입력창 safe-area 대응 */
+  .interviewer-input-bar{
+    padding-bottom:max(12px,env(safe-area-inset-bottom))!important;
+  }
+}
+
+/* ── 공유 드로어: 모바일 바텀시트 전환 ── */
+@media(max-width:639px){
+  .share-drawer{
+    top:auto!important;right:0!important;bottom:0!important;
+    width:100%!important;max-width:100%!important;
+    height:auto!important;max-height:90dvh!important;
+    border-radius:20px 20px 0 0!important;
+    box-shadow:0 -12px 48px rgba(0,0,0,0.18)!important;
+    overflow-y:auto!important;
+    animation:slideUp 0.3s cubic-bezier(0.16,1,0.3,1)!important;
+  }
+}
+
+/* ── 글쓰기 모바일 ── */
+@media(max-width:639px){
+  /* 모드 탭 컴팩트 */
+  .write-mode-tabs button{padding:7px 14px!important;font-size:12px!important}
+  /* 다음 장 버튼 텍스트 축약 */
+  .write-next-btn-long{display:none!important}
+  .write-next-btn-short{display:inline!important}
+}
+
+/* ── 터치 타겟 최소 44×44 ── */
+@media(hover:none) and (pointer:coarse){
+  button,a,[role=button]{min-height:44px;min-width:44px}
+  .touch-compact{min-height:36px!important;min-width:36px!important}
+}
+
 /* ── Safe area ── */
 @supports(padding:max(0px)){
   .sa-b{padding-bottom:max(14px,env(safe-area-inset-bottom))!important}
   .sa-b-lg{padding-bottom:max(20px,calc(env(safe-area-inset-bottom)+8px))!important}
+  .sa-b-input{padding-bottom:max(12px,env(safe-area-inset-bottom))!important}
 }
