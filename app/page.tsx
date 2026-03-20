@@ -235,7 +235,7 @@ export default function LandingPage() {
         <div className="hero-split" style={{ ...MAX_W, display: 'flex', alignItems: 'center', padding: '0 32px' }}>
 
           {/* 좌: 텍스트 */}
-          <div style={{ flex: '1 1 480px', padding: '80px 48px 80px 0', minWidth: 0 }}>
+          <div className="hero-text-col" style={{ flex: '1 1 480px', padding: '80px 48px 80px 0', minWidth: 0 }}>
             <div className="hero-content" style={{ marginBottom: 24 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 32, height: 1, background: '#A0522D', opacity: 0.6 }} />
@@ -306,6 +306,7 @@ export default function LandingPage() {
             flex: '1 1 420px', alignSelf: 'stretch',
             minHeight: 500, position: 'relative', borderRadius: '24px 0 0 24px',
             overflow: 'hidden', marginRight: -32,
+            background: 'linear-gradient(160deg, #3D2B1F 0%, #1A1410 60%, #2A1A12 100%)',
           }}>
             <img
               src="https://images.unsplash.com/photo-1609220136736-443140cfeaa8?w=1200&q=85"
@@ -315,10 +316,10 @@ export default function LandingPage() {
             />
             <div style={{
               position: 'absolute', inset: 0,
-              background: 'linear-gradient(135deg, rgba(240,233,223,0.35) 0%, rgba(0,0,0,0.08) 100%)',
+              background: 'linear-gradient(to bottom, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.18) 40%, rgba(0,0,0,0.62) 100%)',
             }} />
             {/* 우하단 인용구 카드 */}
-            <div style={{
+            <div className="hero-quote-card" style={{
               position: 'absolute', bottom: 32, left: 24, right: 24,
               background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(12px)',
               borderRadius: 16, padding: '20px 24px',
@@ -348,6 +349,59 @@ export default function LandingPage() {
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
             <path d="M7 2v10M2 8l5 5 5-5" stroke={TOKENS.muted} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
+        </div>
+      </section>
+
+      {/* ━━━━ DARK STATEMENT — LIVING ARCHIVE ━━━━━━━━━━━━━ */}
+      <section style={{
+        background: '#1A1816', padding: '120px 32px',
+        textAlign: 'center', position: 'relative', overflow: 'hidden',
+      }}>
+        {/* 배경 그라데이션 광원 */}
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          backgroundImage: 'radial-gradient(ellipse 80% 60% at 20% 50%, rgba(160,82,45,0.1) 0%, transparent 60%), radial-gradient(ellipse 60% 50% at 80% 50%, rgba(201,169,110,0.07) 0%, transparent 60%)',
+        }} />
+
+        <div style={{ maxWidth: 760, margin: '0 auto', position: 'relative', zIndex: 1 }}>
+          {/* 데코 라인 */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginBottom: 44 }}>
+            <div style={{ width: 52, height: 1, background: 'rgba(201,169,110,0.4)' }} />
+            <span style={{
+              fontSize: 9, letterSpacing: 4.5, color: '#C9A96E',
+              fontFamily: TOKENS.sans, fontWeight: 600, textTransform: 'uppercase',
+            }}>Living Archive</span>
+            <div style={{ width: 52, height: 1, background: 'rgba(201,169,110,0.4)' }} />
+          </div>
+
+          <h2 className="reveal" style={{
+            fontFamily: TOKENS.serif,
+            fontSize: 'clamp(2rem, 5.5vw, 3.4rem)',
+            fontWeight: 200, color: '#FAFAF8',
+            letterSpacing: '-0.04em', lineHeight: 1.25,
+            marginBottom: 28, wordBreak: 'keep-all',
+          }}>
+            평범한 하루도,<br />잊혀질 기억도<br />
+            <em style={{ fontStyle: 'normal', color: '#C9A96E' }}>모두 귀한 이야기입니다</em>
+          </h2>
+
+          <p className="reveal reveal-delay-1" style={{
+            fontSize: 'clamp(14px, 2vw, 16px)', color: 'rgba(255,255,255,0.42)',
+            fontFamily: TOKENS.sans, fontWeight: 300, lineHeight: 2,
+            letterSpacing: '0.01em', wordBreak: 'keep-all',
+          }}>
+            지금 기록하지 않으면, 그 소중한 이야기는 영원히 사라집니다.<br />
+            나의이야기가 도와드리겠습니다.
+          </p>
+
+          {/* 장식 */}
+          <div className="reveal reveal-delay-2" style={{ marginTop: 52, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', border: '1px solid rgba(201,169,110,0.5)' }} />
+            <div style={{ width: 48, height: 1, background: 'rgba(201,169,110,0.5)' }} />
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#C9A96E', opacity: 0.7 }} />
+            <div style={{ width: 48, height: 1, background: 'rgba(201,169,110,0.5)' }} />
+            <div style={{ width: 6, height: 6, borderRadius: '50%', border: '1px solid rgba(201,169,110,0.5)' }} />
+          </div>
         </div>
       </section>
 

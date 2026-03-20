@@ -63,9 +63,15 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 /* ── 반응형 ── */
 @media(max-width:768px){
   .hero-split{flex-direction:column!important}
-  .hero-split-img{min-height:260px!important;order:-1}
+  .hero-split-img{min-height:52vh!important;order:-1;border-radius:0!important;margin-right:0!important}
   .scenario-asymmetric{grid-template-columns:1fr!important;grid-template-rows:auto!important}
   .scenario-asymmetric>div:first-child{grid-row:auto!important}
+}
+@media(max-width:639px){
+  /* 히어로 텍스트 영역 모바일 패딩 */
+  .hero-text-col{padding:40px 28px 56px 28px!important}
+  /* 인용구 카드 모바일 숨김 */
+  .hero-quote-card{display:none!important}
 }
 
 /* ── 로그인 좌측 브랜드 패널 (데스크탑만 표시) ── */
