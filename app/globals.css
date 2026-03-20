@@ -68,6 +68,11 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
   .scenario-asymmetric>div:first-child{grid-row:auto!important}
 }
 
+/* ── 로그인 좌측 브랜드 패널 (데스크탑만 표시) ── */
+@media(min-width:700px){
+  .login-brand{display:flex!important}
+}
+
 /* ── 인터뷰어 레이아웃 모바일 ── */
 @media(max-width:639px){
   /* 세로 레이아웃: 사이드바 → 상단 칩 바 */
