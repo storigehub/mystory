@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { useBook, Chapter, Photo, CoverTemplateId } from '@/lib/book-context';
 import { TOKENS, FONT_SIZE_PRESETS } from '@/lib/design-tokens';
 import PrintBook from '@/components/book/PrintBook';
+import CoverEditor from '@/components/book/CoverEditor';
 
 const ACCENT = '#A0522D';
 const GOLD = '#C9A96E';
@@ -34,6 +35,8 @@ const COVER_TEMPLATES = [
   { id: 'dawn',    label: '새벽',   gradient: `linear-gradient(160deg, #1a2a4a, #0d1b2e)`, textColor: '#FAFAF9', accentOpacity: 0.3 },
   { id: 'sunset',  label: '황혼',   gradient: `linear-gradient(160deg, #7a4820, #4a2c10)`, textColor: '#FAFAF9', accentOpacity: 0.3 },
   { id: 'spring',  label: '봄날',   gradient: `linear-gradient(160deg, #E8E0D5, #D4C9BA)`, textColor: '#3D3530', accentOpacity: 0.2 },
+  { id: 'forest',  label: '숲속',   gradient: `linear-gradient(160deg, #1e3a2f, #0d2018)`, textColor: '#FAFAF9', accentOpacity: 0.25 },
+  { id: 'rose',    label: '장미',   gradient: `linear-gradient(160deg, #4d1a2e, #2d0f1a)`, textColor: '#FAFAF9', accentOpacity: 0.25 },
 ] as const;
 
 /* ── 판형 ── */
@@ -98,6 +101,9 @@ export default function BookPage() {
 
   const [viewMode, setViewMode] = useState<'read' | 'flip'>('read');
   const [readPct, setReadPct] = useState(0);
+
+  /* 표지 편집 */
+  const [showCoverEditor, setShowCoverEditor] = useState(false);
 
   /* 공유 패널 */
   const [showSharePanel, setShowSharePanel] = useState(false);
@@ -499,81 +505,205 @@ export default function BookPage() {
       {viewMode === 'read' && (
         <>
           {/* 표지 히어로 */}
-          <div style={{
-            position: 'relative',
-            background: coverTemplate.gradient,
-            color: coverTemplate.textColor,
-            minHeight: '58vh',
-            display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-            overflow: 'hidden',
-          }}>
-            {/* 장식 원 */}
-            <div style={{ position: 'absolute', top: '12%', right: '6%', width: 'clamp(130px,20vw,190px)', height: 'clamp(130px,20vw,190px)', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.06)', pointerEvents: 'none' }} />
-            <div style={{ position: 'absolute', top: '6%', right: '13%', width: 'clamp(55px,9vw,80px)', height: 'clamp(55px,9vw,80px)', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
+          {(() => {
+            const isPhoto = !!state.coverPhotoUrl;
+            const layout = state.coverLayout || 'topleft';
 
-            {/* 표지 템플릿 선택 (no-print) */}
-            <div className="no-print" style={{ position: 'absolute', top: 16, right: 16, display: 'flex', gap: 7, alignItems: 'center' }}>
-              {COVER_TEMPLATES.map((tpl) => (
-                <button
-                  key={tpl.id}
-                  onClick={() => setCoverTemplateId(tpl.id)}
-                  title={tpl.label}
-                  style={{
-                    width: 18, height: 18, borderRadius: '50%', background: tpl.gradient,
-                    border: state.coverTemplateId === tpl.id ? '2px solid rgba(255,255,255,0.9)' : '2px solid rgba(255,255,255,0.2)',
-                    cursor: 'pointer', outline: 'none',
-                    transform: state.coverTemplateId === tpl.id ? 'scale(1.3)' : 'scale(1)',
-                    transition: 'transform 0.15s',
-                    boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
-                  }}
-                />
-              ))}
-            </div>
+            /* ── 사진 커버 텍스트 색상 & 오버레이 ── */
+            const photoTextColor = (layout === 'bottomband' || layout === 'split') ? '#3D3530' : '#FAFAF9';
+            const photoOverlay: Record<string, string> = {
+              topleft:    'linear-gradient(145deg, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.08) 55%, transparent 80%)',
+              center:     'linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.58) 100%)',
+              magazine:   'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.15) 55%, transparent 100%)',
+              minimal:    'linear-gradient(to bottom, transparent 55%, rgba(0,0,0,0.5) 100%)',
+              bottomband: 'none',
+              split:      'none',
+            };
+            const tColor = isPhoto ? photoTextColor : coverTemplate.textColor;
 
-            {/* 저자 이니셜 */}
-            {state.author && (
+            const textBlock = (
               <div style={{
-                position: 'absolute', top: 'clamp(28px,6vw,52px)', left: 'clamp(20px,5vw,72px)',
-                width: 42, height: 42, borderRadius: '50%',
-                background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.18)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                maxWidth: 720,
+                padding: layout === 'topleft' ? 'clamp(36px,7vw,60px) clamp(20px,5vw,72px) clamp(44px,7vw,64px)'
+                  : layout === 'center' ? 'clamp(20px,4vw,36px) clamp(20px,5vw,72px)'
+                  : layout === 'magazine' ? '0 clamp(20px,5vw,72px) clamp(48px,8vw,72px)'
+                  : layout === 'minimal' ? '0 clamp(20px,5vw,72px) clamp(28px,5vw,44px)'
+                  : 'clamp(56px,10vw,96px) clamp(20px,5vw,72px) clamp(44px,7vw,64px)',
               }}>
-                <span style={{ fontSize: 15, fontFamily: TOKENS.serif, color: coverTemplate.textColor, opacity: 0.8 }}>
-                  {state.author[0]}
-                </span>
+                {layout === 'magazine' ? (
+                  /* 매거진 스타일: 굵은 대형 제목 */
+                  <>
+                    <div style={{ width: 36, height: 2, background: ACCENT, marginBottom: 14 }} />
+                    <h1 style={{ fontSize: 'clamp(2.2rem,7vw,3.4rem)', fontWeight: 700, letterSpacing: '0.01em', marginBottom: 10, lineHeight: 1.05, color: tColor, fontFamily: TOKENS.sans, textTransform: 'uppercase' }}>
+                      {state.title || '나의 이야기'}
+                    </h1>
+                    <p style={{ fontSize: 'clamp(12px,2vw,15px)', opacity: 0.65, color: tColor, margin: '0 0 16px', fontFamily: TOKENS.sans, letterSpacing: '0.06em' }}>
+                      {state.author || '저자'}
+                    </p>
+                  </>
+                ) : layout === 'minimal' ? (
+                  /* 미니멀: 아주 작은 텍스트 */
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ width: 32, height: 1, background: 'rgba(255,255,255,0.5)', margin: '0 auto 10px' }} />
+                    <p style={{ fontSize: 'clamp(13px,2.2vw,16px)', letterSpacing: '0.08em', color: tColor, margin: '0 0 4px', fontFamily: TOKENS.sans, opacity: 0.9 }}>
+                      {state.title || '나의 이야기'}
+                    </p>
+                    <p style={{ fontSize: 11, opacity: 0.55, color: tColor, margin: 0, fontFamily: TOKENS.sans, letterSpacing: '0.06em' }}>
+                      {state.author || '저자'}
+                    </p>
+                  </div>
+                ) : (
+                  /* 기본: 세리프 우아한 텍스트 */
+                  <>
+                    <p style={{ fontSize: 10, letterSpacing: 4, opacity: 0.35, fontFamily: TOKENS.sans, marginBottom: 18, textTransform: 'uppercase', color: tColor }}>
+                      나의이야기 · My Story
+                    </p>
+                    <div style={{ width: 36, height: 1, background: tColor, opacity: 0.25, marginBottom: 18 }} />
+                    <h1 style={{ fontSize: 'clamp(1.9rem,6vw,2.8rem)', fontWeight: 300, letterSpacing: '-0.03em', marginBottom: 12, lineHeight: 1.2, color: tColor, fontFamily: TOKENS.serif }}>
+                      {state.title || '나의 이야기'}
+                    </h1>
+                    <p style={{ fontSize: 'clamp(14px,2.5vw,17px)', opacity: 0.6, fontWeight: 300, color: tColor, margin: '0 0 20px', fontFamily: TOKENS.serif }}>
+                      {state.author || '저자'}
+                    </p>
+                    {writtenChapters.length > 0 && (
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '6px 12px', background: 'rgba(255,255,255,0.08)', borderRadius: 20, border: '1px solid rgba(255,255,255,0.13)' }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={tColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.6 }}>
+                          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                        </svg>
+                        <span style={{ fontSize: 11, color: tColor, opacity: 0.6, fontFamily: TOKENS.sans, letterSpacing: 0.5 }}>
+                          {writtenChapters.length}개의 이야기
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
-            )}
+            );
 
-            {/* 텍스트 블록 */}
-            <div style={{ maxWidth: 720, padding: 'clamp(56px,10vw,96px) clamp(20px,5vw,72px) clamp(44px,7vw,64px)' }}>
-              <p style={{ fontSize: 10, letterSpacing: 4, opacity: 0.35, fontFamily: TOKENS.sans, marginBottom: 18, textTransform: 'uppercase', color: coverTemplate.textColor }}>
-                나의이야기 · My Story
-              </p>
-              <div style={{ width: 36, height: 1, background: coverTemplate.textColor, opacity: 0.25, marginBottom: 18 }} />
-              <h1 style={{ fontSize: 'clamp(1.9rem,6vw,2.8rem)', fontWeight: 300, letterSpacing: '-0.03em', marginBottom: 12, lineHeight: 1.2, color: coverTemplate.textColor, fontFamily: TOKENS.serif }}>
-                {state.title || '나의 이야기'}
-              </h1>
-              <p style={{ fontSize: 'clamp(14px,2.5vw,17px)', opacity: 0.6, fontWeight: 300, color: coverTemplate.textColor, margin: '0 0 20px', fontFamily: TOKENS.serif }}>
-                {state.author || '저자'}
-              </p>
-              {writtenChapters.length > 0 && (
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '6px 12px', background: 'rgba(255,255,255,0.08)', borderRadius: 20, border: '1px solid rgba(255,255,255,0.13)' }}>
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={coverTemplate.textColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.6 }}>
-                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-                  </svg>
-                  <span style={{ fontSize: 11, color: coverTemplate.textColor, opacity: 0.6, fontFamily: TOKENS.sans, letterSpacing: 0.5 }}>
-                    {writtenChapters.length}개의 이야기
-                  </span>
+            /* ── 공통 편집 버튼 ── */
+            const editBtn = (
+              <button
+                className="no-print"
+                onClick={() => setShowCoverEditor(true)}
+                style={{
+                  position: 'absolute', top: 16, right: 16,
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '7px 14px',
+                  background: 'rgba(0,0,0,0.32)',
+                  backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(255,255,255,0.22)',
+                  borderRadius: 20, cursor: 'pointer',
+                  color: '#fff', fontFamily: TOKENS.sans, fontSize: 11.5, letterSpacing: 0.3,
+                  transition: 'background 0.18s',
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+                표지 편집
+              </button>
+            );
+
+            /* ── 스크롤 힌트 ── */
+            const scrollHint = (
+              <div className="no-print" style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, opacity: 0.3 }}>
+                <span style={{ fontSize: 9, letterSpacing: 3, fontFamily: TOKENS.sans, color: tColor, textTransform: 'uppercase' }}>scroll</span>
+                <div style={{ width: 1, height: 20, background: tColor }} />
+              </div>
+            );
+
+            /* ── 사진 커버 렌더 ── */
+            if (isPhoto) {
+              if (layout === 'split') {
+                return (
+                  <div style={{ position: 'relative', display: 'flex', minHeight: '62vh', overflow: 'hidden' }}>
+                    {/* 왼쪽: 제목 영역 */}
+                    <div style={{ flex: '0 0 42%', background: '#FAFAF8', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: 'clamp(36px,6vw,56px) clamp(20px,4vw,52px)' }}>
+                      <p style={{ fontSize: 9, letterSpacing: 4, opacity: 0.4, fontFamily: TOKENS.sans, marginBottom: 18, textTransform: 'uppercase', color: '#3D3530' }}>
+                        나의이야기
+                      </p>
+                      <div style={{ width: 28, height: 1, background: '#3D3530', opacity: 0.2, marginBottom: 18 }} />
+                      <h1 style={{ fontSize: 'clamp(1.5rem,4vw,2.2rem)', fontWeight: 300, letterSpacing: '-0.03em', marginBottom: 10, lineHeight: 1.25, color: '#1A1816', fontFamily: TOKENS.serif }}>
+                        {state.title || '나의 이야기'}
+                      </h1>
+                      <p style={{ fontSize: 'clamp(12px,2vw,15px)', opacity: 0.55, fontWeight: 300, color: '#1A1816', margin: 0, fontFamily: TOKENS.serif }}>
+                        {state.author || '저자'}
+                      </p>
+                    </div>
+                    {/* 오른쪽: 사진 */}
+                    <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+                      <img src={state.coverPhotoUrl} alt="cover" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    </div>
+                    {editBtn}
+                    {scrollHint}
+                  </div>
+                );
+              }
+
+              if (layout === 'bottomband') {
+                return (
+                  <div style={{ position: 'relative', minHeight: '62vh', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', overflow: 'hidden' }}>
+                    <img src={state.coverPhotoUrl} alt="cover" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                    {/* 하단 밴드 */}
+                    <div style={{ position: 'relative', background: 'rgba(250,250,248,0.94)', backdropFilter: 'blur(12px)', padding: 'clamp(28px,5vw,44px) clamp(24px,5vw,72px)', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+                      <p style={{ fontSize: 10, letterSpacing: 4, opacity: 0.4, fontFamily: TOKENS.sans, marginBottom: 14, textTransform: 'uppercase', color: '#3D3530' }}>
+                        나의이야기 · My Story
+                      </p>
+                      <h1 style={{ fontSize: 'clamp(1.9rem,6vw,2.8rem)', fontWeight: 300, letterSpacing: '-0.03em', marginBottom: 8, lineHeight: 1.2, color: '#1A1816', fontFamily: TOKENS.serif }}>
+                        {state.title || '나의 이야기'}
+                      </h1>
+                      <p style={{ fontSize: 'clamp(14px,2.5vw,17px)', opacity: 0.55, fontWeight: 300, color: '#1A1816', margin: 0, fontFamily: TOKENS.serif }}>
+                        {state.author || '저자'}
+                      </p>
+                    </div>
+                    {editBtn}
+                  </div>
+                );
+              }
+
+              /* topleft / center / magazine / minimal */
+              const justify = layout === 'topleft' ? 'flex-start' : layout === 'center' ? 'center' : 'flex-end';
+              return (
+                <div style={{ position: 'relative', minHeight: '62vh', display: 'flex', flexDirection: 'column', justifyContent: justify, overflow: 'hidden' }}>
+                  <img src={state.coverPhotoUrl} alt="cover" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                  {photoOverlay[layout] && photoOverlay[layout] !== 'none' && (
+                    <div style={{ position: 'absolute', inset: 0, background: photoOverlay[layout] }} />
+                  )}
+                  <div style={{ position: 'relative' }}>
+                    {textBlock}
+                  </div>
+                  {editBtn}
+                  {layout !== 'magazine' && scrollHint}
                 </div>
-              )}
-            </div>
+              );
+            }
 
-            {/* 스크롤 힌트 */}
-            <div className="no-print" style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, opacity: 0.3 }}>
-              <span style={{ fontSize: 9, letterSpacing: 3, fontFamily: TOKENS.sans, color: coverTemplate.textColor, textTransform: 'uppercase' }}>scroll</span>
-              <div style={{ width: 1, height: 20, background: coverTemplate.textColor }} />
-            </div>
-          </div>
+            /* ── 그라디언트 커버 렌더 (기존) ── */
+            return (
+              <div style={{
+                position: 'relative',
+                background: coverTemplate.gradient,
+                color: coverTemplate.textColor,
+                minHeight: '58vh',
+                display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+                overflow: 'hidden',
+              }}>
+                {/* 장식 원 */}
+                <div style={{ position: 'absolute', top: '12%', right: '6%', width: 'clamp(130px,20vw,190px)', height: 'clamp(130px,20vw,190px)', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.06)', pointerEvents: 'none' }} />
+                <div style={{ position: 'absolute', top: '6%', right: '13%', width: 'clamp(55px,9vw,80px)', height: 'clamp(55px,9vw,80px)', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
+                {/* 저자 이니셜 */}
+                {state.author && (
+                  <div style={{ position: 'absolute', top: 'clamp(28px,6vw,52px)', left: 'clamp(20px,5vw,72px)', width: 42, height: 42, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: 15, fontFamily: TOKENS.serif, color: coverTemplate.textColor, opacity: 0.8 }}>{state.author[0]}</span>
+                  </div>
+                )}
+                {textBlock}
+                {editBtn}
+                {scrollHint}
+              </div>
+            );
+          })()}
 
           {/* 목차 */}
           {writtenChapters.length > 0 && (
@@ -805,6 +935,11 @@ export default function BookPage() {
         coverGradient={coverTemplate.gradient}
         coverTextColor={coverTemplate.textColor}
       />
+
+      {/* ══════════════════════════════════
+          표지 편집 모달
+      ══════════════════════════════════ */}
+      {showCoverEditor && <CoverEditor onClose={() => setShowCoverEditor(false)} />}
 
       {/* ══════════════════════════════════
           공유 패널 (우측 드로어)

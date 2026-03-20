@@ -33,6 +33,8 @@ interface SyncBody {
   title: string;
   author: string;
   coverTemplateId?: string;
+  coverPhotoUrl?: string;
+  coverLayout?: string;
   chapters: SyncChapter[];
 }
 
@@ -76,6 +78,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         title: body.title,
         author: body.author,
         cover_template: body.coverTemplateId ?? 'classic',
+        cover_photo_url: body.coverPhotoUrl ?? '',
+        cover_layout: body.coverLayout ?? 'topleft',
       })
       .eq('id', bookId);
 

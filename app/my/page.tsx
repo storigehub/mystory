@@ -16,6 +16,9 @@ interface BookSummary {
   chapter_count: number;
   is_public: boolean;
   share_token: string | null;
+  cover_template?: string;
+  cover_photo_url?: string;
+  cover_layout?: string;
 }
 
 interface ChapterSummary {
@@ -433,7 +436,21 @@ export default function MyPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {sortedBooks.map((book) => {
               const isExpanded = expandedBook === book.id;
-              const grad = coverGradient(book.title);
+              // 실제 커버 템플릿 → 그라디언트 매핑
+              const TEMPLATE_GRADS: Record<string, string> = {
+                classic: 'linear-gradient(160deg, #3D3530, #1C1A18)',
+                dawn:    'linear-gradient(160deg, #1a2a4a, #0d1b2e)',
+                sunset:  'linear-gradient(160deg, #7a4820, #4a2c10)',
+                spring:  'linear-gradient(160deg, #E8E0D5, #D4C9BA)',
+                forest:  'linear-gradient(160deg, #1e3a2f, #0d2018)',
+                rose:    'linear-gradient(160deg, #4d1a2e, #2d0f1a)',
+              };
+              const TEMPLATE_TEXT: Record<string, string> = {
+                spring: '#3D3530',
+              };
+              const grad = book.cover_template ? (TEMPLATE_GRADS[book.cover_template] ?? coverGradient(book.title)) : coverGradient(book.title);
+              const coverTextColor = TEMPLATE_TEXT[book.cover_template || ''] ?? 'rgba(255,255,255,0.85)';
+              const hasPhoto = !!book.cover_photo_url;
               const doneCount = (chaptersMap[book.id] || []).filter(c => c.is_done).length;
               const totalCount = chaptersMap[book.id]?.length ?? book.chapter_count;
 
@@ -455,37 +472,53 @@ export default function MyPage() {
                     <div
                       style={{
                         width: 96, flexShrink: 0,
-                        background: grad,
+                        background: hasPhoto ? '#000' : grad,
                         display: 'flex', flexDirection: 'column',
                         alignItems: 'center', justifyContent: 'center',
-                        padding: '20px 8px', minHeight: 152,
+                        padding: hasPhoto ? 0 : '20px 8px', minHeight: 152,
                         position: 'relative', cursor: 'pointer',
+                        overflow: 'hidden',
                       }}
                       onClick={() => router.push(`/book?id=${book.id}`)}
                     >
-                      {/* 책 등 */}
-                      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 6, background: 'rgba(0,0,0,0.2)' }} />
-                      {/* 장식선 */}
-                      <div style={{ width: 28, height: 1, background: 'rgba(255,255,255,0.25)', marginBottom: 8 }} />
-                      <p style={{
-                        fontSize: 10, fontWeight: 300, lineHeight: 1.5,
-                        textAlign: 'center', wordBreak: 'keep-all',
-                        letterSpacing: '-0.01em',
-                        color: 'rgba(255,255,255,0.85)',
-                        maxWidth: 64, fontFamily: TOKENS.serif,
-                      }}>
-                        {book.title}
-                      </p>
-                      <div style={{ width: 28, height: 1, background: 'rgba(255,255,255,0.25)', marginTop: 8 }} />
-                      {/* 읽기 힌트 */}
-                      <p style={{
-                        position: 'absolute', bottom: 8,
-                        fontSize: 9, color: 'rgba(255,255,255,0.4)',
-                        letterSpacing: 1, fontFamily: TOKENS.sans,
-                        textTransform: 'uppercase',
-                      }}>
-                        Read
-                      </p>
+                      {/* 사진 커버 */}
+                      {hasPhoto && (
+                        <>
+                          <img src={book.cover_photo_url} alt="cover" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.1) 60%, transparent 100%)' }} />
+                          <p style={{ position: 'relative', fontSize: 10, fontWeight: 400, lineHeight: 1.5, textAlign: 'center', wordBreak: 'keep-all', letterSpacing: '-0.01em', color: 'rgba(255,255,255,0.92)', maxWidth: 72, fontFamily: TOKENS.serif, textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+                            {book.title}
+                          </p>
+                        </>
+                      )}
+                      {/* 그라디언트 커버 */}
+                      {!hasPhoto && (
+                        <>
+                          {/* 책 등 */}
+                          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 6, background: 'rgba(0,0,0,0.2)' }} />
+                          {/* 장식선 */}
+                          <div style={{ width: 28, height: 1, background: book.cover_template === 'spring' ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.25)', marginBottom: 8 }} />
+                          <p style={{
+                            fontSize: 10, fontWeight: 300, lineHeight: 1.5,
+                            textAlign: 'center', wordBreak: 'keep-all',
+                            letterSpacing: '-0.01em',
+                            color: coverTextColor,
+                            maxWidth: 64, fontFamily: TOKENS.serif,
+                          }}>
+                            {book.title}
+                          </p>
+                          <div style={{ width: 28, height: 1, background: book.cover_template === 'spring' ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.25)', marginTop: 8 }} />
+                          {/* 읽기 힌트 */}
+                          <p style={{
+                            position: 'absolute', bottom: 8,
+                            fontSize: 9, color: book.cover_template === 'spring' ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.4)',
+                            letterSpacing: 1, fontFamily: TOKENS.sans,
+                            textTransform: 'uppercase',
+                          }}>
+                            Read
+                          </p>
+                        </>
+                      )}
                     </div>
 
                     {/* 책 정보 */}

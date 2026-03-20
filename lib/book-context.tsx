@@ -43,7 +43,7 @@ export interface Chapter {
   done: boolean;
 }
 
-export type CoverTemplateId = 'classic' | 'dawn' | 'sunset' | 'spring';
+export type CoverTemplateId = 'classic' | 'dawn' | 'sunset' | 'spring' | 'forest' | 'rose';
 
 export interface BookState {
   // 책 메타
@@ -52,6 +52,8 @@ export interface BookState {
   author: string;
   createdAt: string;
   coverTemplateId: CoverTemplateId; // 표지 템플릿
+  coverPhotoUrl: string;  // 커스텀 커버 사진 URL (비어있으면 템플릿 사용)
+  coverLayout: string;    // 사진 커버 레이아웃 ID
 
   // 챕터
   selectedTopics: Array<{ id: string; title: string; custom: boolean }>;
@@ -70,6 +72,8 @@ export const DEFAULT_BOOK_STATE: BookState = {
   author: '',
   createdAt: new Date().toISOString(),
   coverTemplateId: 'classic',
+  coverPhotoUrl: '',
+  coverLayout: 'topleft',
   selectedTopics: [],
   chapters: [],
   currentChapterIdx: 0,
@@ -109,6 +113,8 @@ interface BookContextType {
   setSTTMode: (mode: 'browser' | 'whisper' | 'off') => void;
   setAutoSendAudio: (enabled: boolean) => void;
   setCoverTemplateId: (id: CoverTemplateId) => void;
+  setCoverPhotoUrl: (url: string) => void;
+  setCoverLayout: (layout: string) => void;
 
   // DB
   syncToDb: () => Promise<void>;
@@ -240,6 +246,8 @@ export function BookProvider({ children }: { children: ReactNode }) {
       title: state.title,
       author: state.author,
       coverTemplateId: state.coverTemplateId,
+      coverPhotoUrl: state.coverPhotoUrl,
+      coverLayout: state.coverLayout,
       chapters: state.chapters,
     });
 
@@ -254,7 +262,7 @@ export function BookProvider({ children }: { children: ReactNode }) {
       if (syncTimer.current) clearTimeout(syncTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.title, state.author, state.coverTemplateId, state.chapters, isHydrated, userId]);
+  }, [state.title, state.author, state.coverTemplateId, state.coverPhotoUrl, state.coverLayout, state.chapters, isHydrated, userId]);
 
   /* ── 내부 동기화 함수 ── */
   const syncToDbInternal = useCallback(async (currentState: BookState) => {
@@ -270,6 +278,8 @@ export function BookProvider({ children }: { children: ReactNode }) {
           title: currentState.title,
           author: currentState.author,
           coverTemplateId: currentState.coverTemplateId,
+          coverPhotoUrl: currentState.coverPhotoUrl,
+          coverLayout: currentState.coverLayout,
           chapters: currentState.chapters,
         }),
       });
@@ -299,6 +309,8 @@ export function BookProvider({ children }: { children: ReactNode }) {
         title: currentState.title,
         author: currentState.author,
         coverTemplateId: currentState.coverTemplateId,
+        coverPhotoUrl: currentState.coverPhotoUrl,
+        coverLayout: currentState.coverLayout,
         chapters: currentState.chapters,
       });
     } catch (err) {
@@ -417,6 +429,8 @@ export function BookProvider({ children }: { children: ReactNode }) {
         title: book.title || '나의 이야기',
         author: book.author || '',
         coverTemplateId: (book.cover_template as CoverTemplateId) || 'classic',
+        coverPhotoUrl: (book as any).cover_photo_url || '',
+        coverLayout: (book as any).cover_layout || 'topleft',
         chapters,
         selectedTopics,
         currentChapterIdx: 0,
@@ -568,6 +582,10 @@ export function BookProvider({ children }: { children: ReactNode }) {
       updateState((prev) => ({ ...prev, autoSendAudio })),
     setCoverTemplateId: (coverTemplateId) =>
       updateState((prev) => ({ ...prev, coverTemplateId })),
+    setCoverPhotoUrl: (coverPhotoUrl) =>
+      updateState((prev) => ({ ...prev, coverPhotoUrl })),
+    setCoverLayout: (coverLayout) =>
+      updateState((prev) => ({ ...prev, coverLayout })),
 
     syncToDb,
     resetBook,
