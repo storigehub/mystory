@@ -263,32 +263,35 @@ export default function NormalEditor({ chapter, chapterIdx, maxDurationSec = 120
   const micLabel = whisper.isTranscribing ? '전사 중...' : isVoiceActive ? '중지' : '녹음';
 
   const toolBtn = (active?: boolean): React.CSSProperties => ({
-    display: 'flex', alignItems: 'center', gap: 4,
-    padding: '8px 14px',
+    display: 'flex', alignItems: 'center', gap: 5,
+    padding: '7px 16px',
     border: `1px solid ${active ? '#FECACA' : TOKENS.border}`,
-    borderRadius: TOKENS.radiusSm,
+    borderRadius: 40,
     background: active ? '#FEF2F2' : TOKENS.card,
     cursor: active && whisper.isTranscribing ? 'wait' : 'pointer',
     fontSize: 13, fontFamily: TOKENS.sans,
     color: active ? '#991B1B' : TOKENS.subtext,
-    minHeight: 40,
+    minHeight: 36,
+    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+    transition: 'all 0.18s ease',
   });
 
   const photoAddBtn: React.CSSProperties = {
     background: 'none',
-    border: `1px dashed ${TOKENS.border}`,
-    borderRadius: TOKENS.radiusSm,
-    padding: '7px 18px',
+    border: `1.5px dashed ${TOKENS.border}`,
+    borderRadius: 40,
+    padding: '7px 20px',
     fontSize: 12, fontFamily: TOKENS.sans,
     color: TOKENS.muted, cursor: 'pointer',
     display: 'inline-flex', alignItems: 'center', gap: 5,
+    transition: 'border-color 0.18s, color 0.18s',
   };
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
       {/* ── Toolbar ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: TOKENS.bg, borderBottom: `1px solid ${TOKENS.borderLight}`, flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', background: TOKENS.bg, borderBottom: `1px solid ${TOKENS.borderLight}`, flexShrink: 0 }}>
         <input ref={fileRef} type="file" accept="image/*" onChange={onFileSelect} style={{ display: 'none' }} />
         <button onClick={() => handleAddPhoto(activeBidRef.current)} disabled={isUploading} style={toolBtn(isUploading)}>
           <PhotoIcon /><span>{isUploading ? '업로드 중...' : '사진'}</span>
@@ -309,10 +312,10 @@ export default function NormalEditor({ chapter, chapterIdx, maxDurationSec = 120
 
       {/* Recording indicator */}
       {isVoiceActive && (
-        <div style={{ padding: '10px 16px', background: whisper.isTranscribing ? '#EFF6FF' : '#FEF2F2', borderBottom: `1px solid ${whisper.isTranscribing ? '#BFDBFE' : '#FECACA'}`, display: 'flex', alignItems: 'center', gap: 10, fontFamily: TOKENS.sans, flexShrink: 0 }}>
-          <span style={{ width: 10, height: 10, borderRadius: '50%', background: whisper.isTranscribing ? '#3B82F6' : '#DC2626', animation: 'pulse 1s infinite', flexShrink: 0 }} />
-          <span style={{ fontSize: 13, color: whisper.isTranscribing ? '#1E40AF' : '#991B1B' }}>
-            {whisper.isTranscribing ? '전사 중...' : whisper.isRecording ? '녹음 중... (버튼을 누르면 중지)' : '음성 인식 중...'}
+        <div style={{ padding: '9px 16px', background: whisper.isTranscribing ? '#EFF6FF' : '#FFF5F5', borderBottom: `1px solid ${whisper.isTranscribing ? '#BFDBFE' : '#FED7D7'}`, display: 'flex', alignItems: 'center', gap: 10, fontFamily: TOKENS.sans, flexShrink: 0 }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: whisper.isTranscribing ? '#3B82F6' : '#E53E3E', animation: 'pulse 1s infinite', flexShrink: 0 }} />
+          <span style={{ fontSize: 13, color: whisper.isTranscribing ? '#1E40AF' : '#9B2C2C' }}>
+            {whisper.isTranscribing ? '전사 중...' : whisper.isRecording ? '녹음 중 — 버튼을 다시 누르면 완료됩니다' : '음성 인식 중...'}
           </span>
           {isListening && transcript && (
             <span style={{ fontSize: 12, color: TOKENS.subtext, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>"{transcript}"</span>
@@ -320,7 +323,7 @@ export default function NormalEditor({ chapter, chapterIdx, maxDurationSec = 120
         </div>
       )}
       {whisper.error && (
-        <div style={{ padding: '8px 16px', background: '#FEF2F2', borderBottom: '1px solid #FECACA', fontSize: 12, color: '#DC2626', fontFamily: TOKENS.sans }}>
+        <div style={{ padding: '8px 16px', background: '#FFF5F5', borderBottom: '1px solid #FED7D7', fontSize: 12, color: '#E53E3E', fontFamily: TOKENS.sans }}>
           {whisper.error}
         </div>
       )}
@@ -330,10 +333,10 @@ export default function NormalEditor({ chapter, chapterIdx, maxDurationSec = 120
         <div style={{ maxWidth: 600, margin: '0 auto' }}>
 
           {/* 챕터 헤더 */}
-          <div style={{ textAlign: 'center', marginBottom: 24 }}>
-            <p style={{ fontSize: 11, color: TOKENS.muted, fontFamily: TOKENS.sans, letterSpacing: 3, marginBottom: 6 }}>챕터</p>
-            <h2 style={{ fontSize: 'clamp(1.2rem, 5vw, 1.4rem)', fontWeight: 400 }}>{chapter.title}</h2>
-            <div style={{ width: 32, height: 1, background: TOKENS.accent, margin: '12px auto 0', opacity: 0.6 }} />
+          <div style={{ textAlign: 'center', marginBottom: 28 }}>
+            <p style={{ fontSize: 10, color: TOKENS.muted, fontFamily: TOKENS.sans, letterSpacing: 4, textTransform: 'uppercase', marginBottom: 8 }}>Chapter</p>
+            <h2 style={{ fontSize: 'clamp(1.25rem, 5vw, 1.5rem)', fontWeight: 400, fontFamily: TOKENS.serif, color: TOKENS.text }}>{chapter.title}</h2>
+            <div style={{ width: 40, height: 1, background: `linear-gradient(90deg, ${TOKENS.accent}, #C9A96E)`, margin: '14px auto 0', opacity: 0.7 }} />
           </div>
 
           {/* 도움말 힌트 */}
@@ -403,11 +406,11 @@ export default function NormalEditor({ chapter, chapterIdx, maxDurationSec = 120
                 key={block.bid}
                 style={{
                   background: TOKENS.card,
-                  borderRadius: TOKENS.radiusSm,
+                  borderRadius: 14,
                   overflow: 'hidden',
-                  border: `1.5px solid ${photo.isFeatured ? '#b0986a' : TOKENS.borderLight}`,
-                  marginBottom: 8,
-                  boxShadow: photo.isFeatured ? '0 0 0 2px rgba(176,152,106,0.25)' : TOKENS.shadowSm,
+                  border: `1.5px solid ${photo.isFeatured ? '#C9A96E' : TOKENS.borderLight}`,
+                  marginBottom: 10,
+                  boxShadow: photo.isFeatured ? '0 0 0 3px rgba(201,169,110,0.2), 0 4px 16px rgba(0,0,0,0.1)' : '0 2px 10px rgba(0,0,0,0.07)',
                 }}
               >
                 <div style={{ position: 'relative' }}>
@@ -446,7 +449,7 @@ export default function NormalEditor({ chapter, chapterIdx, maxDurationSec = 120
                   value={photo.caption || ''}
                   onChange={(e) => updatePhotoCaption(chapterIdxRef.current, photo.id, e.target.value)}
                   placeholder="사진 설명을 입력하세요..."
-                  style={{ width: '100%', padding: '11px 14px', border: 'none', borderTop: `1px solid ${TOKENS.borderLight}`, fontSize: 13, fontFamily: TOKENS.sans, outline: 'none', color: TOKENS.subtext, background: TOKENS.card, boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '12px 16px', border: 'none', borderTop: `1px solid ${TOKENS.borderLight}`, fontSize: 13, fontFamily: TOKENS.serif, outline: 'none', color: TOKENS.subtext, background: TOKENS.card, boxSizing: 'border-box', fontStyle: 'italic' }}
                 />
               </div>
             );
