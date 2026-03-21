@@ -165,6 +165,17 @@ export default function AdminPage() {
           <h1 style={{ fontSize: 22, fontWeight: 400, fontFamily: TOKENS.serif, margin: 0 }}>관리자 대시보드</h1>
           <div style={{ flex: 1 }} />
           <a
+            href="/admin/landing"
+            style={{
+              padding: '8px 16px', borderRadius: TOKENS.radiusSm,
+              border: `1px solid ${TOKENS.border}`,
+              fontSize: 13, fontFamily: TOKENS.sans, color: TOKENS.text,
+              textDecoration: 'none', background: TOKENS.card,
+            }}
+          >
+            🎨 랜딩 관리
+          </a>
+          <a
             href="/admin/settings"
             style={{
               padding: '8px 16px', borderRadius: TOKENS.radiusSm,

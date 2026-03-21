@@ -24,7 +24,16 @@ function useReveal() {
 
 /* ─── 정적 데이터 ───────────────────────────────────────── */
 
-const PILLARS = [
+const DEFAULT_HERO = {
+  image: 'https://images.pexels.com/photos/7363991/pexels-photo-7363991.jpeg?auto=compress&cs=tinysrgb&w=1200',
+  title: '당신의 삶이\n한 권의 책이\n됩니다',
+  accentWord: '한 권의 책',
+  subtitle: '소중한 기억을 AI와의 대화로 이야기하세요.\n그 이야기가 가족과 함께할 책이 됩니다.',
+  quote: '내 이야기를 글로 남길 수 있을 거라\n생각도 못 했는데, 정말 신기하네요.',
+  quoteAuthor: '— 김순자 님 (78세), 인천',
+};
+
+const DEFAULT_PILLARS = [
   {
     image: 'https://images.pexels.com/photos/5637842/pexels-photo-5637842.jpeg?auto=compress&cs=tinysrgb&w=900',
     fallback: '#7C6A5A',
@@ -81,7 +90,7 @@ const STEPS = [
   },
 ];
 
-const SCENARIOS = [
+const DEFAULT_SCENARIOS = [
   {
     image: 'https://images.pexels.com/photos/5637710/pexels-photo-5637710.jpeg?auto=compress&cs=tinysrgb&w=1200',
     fallback: '#8B7355',
@@ -157,6 +166,23 @@ export default function LandingPage() {
   const [dbDismissed, setDbDismissed] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [scrolled, setScrolled] = useState(false);
+
+  /* ── 관리자 설정 동적 로딩 ── */
+  const [hero, setHero] = useState(DEFAULT_HERO);
+  const [pillars, setPillars] = useState(DEFAULT_PILLARS);
+  const [scenarios, setScenarios] = useState(DEFAULT_SCENARIOS);
+
+  useEffect(() => {
+    fetch('/api/landing')
+      .then(r => r.ok ? r.json() : null)
+      .then(cfg => {
+        if (!cfg) return;
+        if (cfg.hero) setHero(prev => ({ ...prev, ...cfg.hero }));
+        if (cfg.pillars?.length) setPillars(cfg.pillars);
+        if (cfg.scenarios?.length) setScenarios(cfg.scenarios);
+      })
+      .catch(() => {});
+  }, []);
 
   const isLoggedIn = status === 'authenticated';
 
@@ -256,9 +282,13 @@ export default function LandingPage() {
               letterSpacing: '-0.04em', color: '#1A1816',
               marginBottom: 28, wordBreak: 'keep-all',
             }}>
-              당신의 삶이<br />
-              <em style={{ fontStyle: 'normal', color: '#A0522D' }}>한 권의 책</em>이<br />
-              됩니다
+              {hero.title.split('\n').map((line, i, arr) => {
+                if (hero.accentWord && line.includes(hero.accentWord)) {
+                  const parts = line.split(hero.accentWord);
+                  return <span key={i}>{parts[0]}<em style={{ fontStyle: 'normal', color: '#A0522D' }}>{hero.accentWord}</em>{parts[1]}{i < arr.length - 1 && <br />}</span>;
+                }
+                return <span key={i}>{line}{i < arr.length - 1 && <br />}</span>;
+              })}
             </h1>
 
             <p className="hero-sub" style={{
@@ -266,8 +296,9 @@ export default function LandingPage() {
               lineHeight: 2, maxWidth: 360, marginBottom: 44,
               wordBreak: 'keep-all', fontFamily: TOKENS.sans, fontWeight: 300,
             }}>
-              소중한 기억을 AI와의 대화로 이야기하세요.<br />
-              그 이야기가 가족과 함께할 책이 됩니다.
+              {hero.subtitle.split('\n').map((line, i, arr) => (
+                <span key={i}>{line}{i < arr.length - 1 && <br />}</span>
+              ))}
             </p>
 
             <div className="hero-cta" style={{ display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'flex-start' }}>
@@ -315,16 +346,10 @@ export default function LandingPage() {
             background: 'linear-gradient(160deg, #3D2B1F 0%, #1A1410 60%, #2A1A12 100%)',
           }}>
             <img
-              src="https://images.pexels.com/photos/7363991/pexels-photo-7363991.jpeg?auto=compress&cs=tinysrgb&w=1200"
-              alt="할머니와 손녀가 함께하는 따뜻한 순간"
+              src={hero.image}
+              alt="히어로 이미지"
               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 30%' }}
-              onError={(e) => {
-                const img = e.target as HTMLImageElement;
-                if (!img.dataset.fallback) {
-                  img.dataset.fallback = '1';
-                  img.src = 'https://images.pexels.com/photos/5637704/pexels-photo-5637704.jpeg?auto=compress&cs=tinysrgb&w=1200';
-                }
-              }}
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
             />
             <div style={{
               position: 'absolute', inset: 0,
@@ -342,10 +367,12 @@ export default function LandingPage() {
                 color: '#1A1816', lineHeight: 1.65, letterSpacing: '-0.01em',
                 wordBreak: 'keep-all',
               }}>
-                "내 이야기를 글로 남길 수 있을 거라<br />생각도 못 했는데, 정말 신기하네요."
+                {`\u201C${hero.quote.replace(/\n/g, '\n')}\u201D`.split('\n').map((line, i, arr) => (
+                  <span key={i}>{line}{i < arr.length - 1 && <br />}</span>
+                ))}
               </p>
               <p style={{ fontSize: 11, color: TOKENS.muted, marginTop: 10, fontFamily: TOKENS.sans }}>
-                — 김순자 님 (78세), 인천
+                {hero.quoteAuthor}
               </p>
             </div>
           </div>
@@ -432,7 +459,7 @@ export default function LandingPage() {
           </div>
 
           <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', justifyContent: 'center' }}>
-            {PILLARS.map((p, i) => (
+            {pillars.map((p, i) => (
               <div key={i} className={`card-hover img-zoom reveal reveal-delay-${i + 1}`} style={{
                 flex: '1 1 280px', maxWidth: 340, borderRadius: 24,
                 overflow: 'hidden', boxShadow: '0 8px 40px rgba(0,0,0,0.14)',
@@ -554,9 +581,9 @@ export default function LandingPage() {
               borderRadius: 24, overflow: 'hidden',
               boxShadow: '0 8px 40px rgba(0,0,0,0.14)',
               position: 'relative',
-              background: SCENARIOS[0].fallback, cursor: 'default',
+              background: scenarios[0].fallback, cursor: 'default',
             }}>
-              <img src={SCENARIOS[0].image} alt={SCENARIOS[0].tag} style={{
+              <img src={scenarios[0].image} alt={scenarios[0].tag} style={{
                 position: 'absolute', inset: 0, width: '100%', height: '100%',
                 objectFit: 'cover', objectPosition: 'center 30%',
               }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
@@ -570,21 +597,21 @@ export default function LandingPage() {
                   backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.28)',
                   borderRadius: 40, padding: '4px 14px', fontSize: 11,
                   letterSpacing: 1.5, fontFamily: TOKENS.sans, fontWeight: 500, marginBottom: 12,
-                }}>{SCENARIOS[0].tag}</span>
+                }}>{scenarios[0].tag}</span>
                 <h3 style={{
                   fontFamily: TOKENS.serif, fontSize: 'clamp(1.15rem, 2.2vw, 1.45rem)',
                   fontWeight: 300, marginBottom: 10, letterSpacing: '-0.025em',
                   lineHeight: 1.35, whiteSpace: 'pre-line', wordBreak: 'keep-all',
-                }}>{SCENARIOS[0].title}</h3>
+                }}>{scenarios[0].title}</h3>
                 <p style={{
                   fontSize: 13.5, lineHeight: 1.8, color: 'rgba(255,255,255,0.78)',
                   fontFamily: TOKENS.sans, fontWeight: 300, wordBreak: 'keep-all', whiteSpace: 'pre-line',
-                }}>{SCENARIOS[0].desc}</p>
+                }}>{scenarios[0].desc}</p>
               </div>
             </div>
 
             {/* CARD 1: 유산 — 오른쪽 1행 */}
-            {[SCENARIOS[1], SCENARIOS[2]].map((s, i) => (
+            {[scenarios[1], scenarios[2]].map((s, i) => (
               <div key={i} className={`card-hover img-zoom reveal reveal-delay-${i + 1}`} style={{
                 gridColumn: 2, gridRow: i + 1,
                 borderRadius: 20, overflow: 'hidden',
@@ -622,9 +649,9 @@ export default function LandingPage() {
               borderRadius: 20, overflow: 'hidden',
               boxShadow: '0 6px 28px rgba(0,0,0,0.12)',
               position: 'relative',
-              background: SCENARIOS[3].fallback, cursor: 'default',
+              background: scenarios[3].fallback, cursor: 'default',
             }}>
-              <img src={SCENARIOS[3].image} alt={SCENARIOS[3].tag} style={{
+              <img src={scenarios[3].image} alt={scenarios[3].tag} style={{
                 position: 'absolute', inset: 0, width: '100%', height: '100%',
                 objectFit: 'cover', objectPosition: 'center 35%',
               }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
@@ -638,12 +665,12 @@ export default function LandingPage() {
                   backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.25)',
                   borderRadius: 40, padding: '3px 11px', fontSize: 10,
                   letterSpacing: 1, fontFamily: TOKENS.sans, marginBottom: 8,
-                }}>{SCENARIOS[3].tag}</span>
+                }}>{scenarios[3].tag}</span>
                 <h3 style={{
                   fontFamily: TOKENS.serif, fontSize: 15, fontWeight: 300,
                   letterSpacing: '-0.015em', lineHeight: 1.4,
                   whiteSpace: 'pre-line', wordBreak: 'keep-all',
-                }}>{SCENARIOS[3].title}</h3>
+                }}>{scenarios[3].title}</h3>
               </div>
             </div>
 
@@ -653,9 +680,9 @@ export default function LandingPage() {
               borderRadius: 20, overflow: 'hidden',
               boxShadow: '0 6px 28px rgba(0,0,0,0.12)',
               position: 'relative',
-              background: SCENARIOS[4].fallback, cursor: 'default',
+              background: scenarios[4].fallback, cursor: 'default',
             }}>
-              <img src={SCENARIOS[4].image} alt={SCENARIOS[4].tag} style={{
+              <img src={scenarios[4].image} alt={scenarios[4].tag} style={{
                 position: 'absolute', inset: 0, width: '100%', height: '100%',
                 objectFit: 'cover', objectPosition: 'center 30%',
               }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
@@ -669,12 +696,12 @@ export default function LandingPage() {
                   backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.25)',
                   borderRadius: 40, padding: '3px 11px', fontSize: 10,
                   letterSpacing: 1, fontFamily: TOKENS.sans, marginBottom: 8,
-                }}>{SCENARIOS[4].tag}</span>
+                }}>{scenarios[4].tag}</span>
                 <h3 style={{
                   fontFamily: TOKENS.serif, fontSize: 15, fontWeight: 300,
                   letterSpacing: '-0.015em', lineHeight: 1.4,
                   whiteSpace: 'pre-line', wordBreak: 'keep-all',
-                }}>{SCENARIOS[4].title}</h3>
+                }}>{scenarios[4].title}</h3>
               </div>
             </div>
           </div>
