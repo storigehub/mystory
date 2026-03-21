@@ -5,6 +5,7 @@ import { useBook, Chapter } from '@/lib/book-context';
 import { TOKENS, FONT_SIZE_PRESETS } from '@/lib/design-tokens';
 import { getHint } from '@/lib/interview-questions';
 import { useWhisperSTT } from '@/lib/use-whisper-stt';
+import { compressImage } from '@/lib/compress-image';
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -161,8 +162,10 @@ export default function NormalEditor({ chapter, chapterIdx, maxDurationSec = 120
 
     setIsUploading(true);
     try {
+      // 4.5MB Vercel 제한 대응: 업로드 전 클라이언트 압축
+      const compressed = await compressImage(file);
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', compressed);
       const res = await fetch('/api/upload/photo', { method: 'POST', body: formData });
       const json = await res.json();
       if (!res.ok || !json.url) throw new Error(json.error || '업로드 실패');

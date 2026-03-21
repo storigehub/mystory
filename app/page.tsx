@@ -26,21 +26,21 @@ function useReveal() {
 
 const PILLARS = [
   {
-    image: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=900&q=85',
+    image: 'https://images.pexels.com/photos/7414284/pexels-photo-7414284.jpeg?auto=compress&cs=tinysrgb&w=900',
     fallback: '#7C6A5A',
     tag: '쉬운 대화',
     title: '말하듯 편하게,\nAI가 이끌어갑니다',
     desc: '글쓰기 실력은 필요 없습니다. AI가 질문하면 말씀하시듯 편하게 대답하기만 하면 됩니다.',
   },
   {
-    image: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=900&q=85',
+    image: 'https://images.pexels.com/photos/5699456/pexels-photo-5699456.jpeg?auto=compress&cs=tinysrgb&w=900',
     fallback: '#5A6A5A',
     tag: '아름다운 책',
     title: '이야기가 한 권의\n책이 됩니다',
     desc: '나누신 이야기가 아름답게 정리되어 언제든 다시 읽을 수 있는 책으로 완성됩니다.',
   },
   {
-    image: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=900&q=85',
+    image: 'https://images.pexels.com/photos/7180617/pexels-photo-7180617.jpeg?auto=compress&cs=tinysrgb&w=900',
     fallback: '#5A5A6A',
     tag: '가족과 공유',
     title: '소중한 이야기를\n가족과 나눕니다',
@@ -83,7 +83,7 @@ const STEPS = [
 
 const SCENARIOS = [
   {
-    image: 'https://images.unsplash.com/photo-1609220136736-443140cfeaa8?w=1200&q=85',
+    image: 'https://images.pexels.com/photos/8088495/pexels-photo-8088495.jpeg?auto=compress&cs=tinysrgb&w=1200',
     fallback: '#8B7355',
     tag: '선물',
     title: '부모님께 드리는\n가장 특별한 선물',
@@ -91,21 +91,21 @@ const SCENARIOS = [
     large: true,
   },
   {
-    image: 'https://images.unsplash.com/photo-1603539947678-cd3954ed515d?w=800&q=85',
+    image: 'https://images.pexels.com/photos/4145354/pexels-photo-4145354.jpeg?auto=compress&cs=tinysrgb&w=800',
     fallback: '#6B7B6B',
     tag: '유산',
     title: '자녀에게 남기는\n소중한 이야기',
     desc: '내 삶의 지혜와 기억을 다음 세대에게.\n말로만 전하던 이야기를 영원히 남깁니다.',
   },
   {
-    image: 'https://images.unsplash.com/photo-1511895426328-dc8714191011?w=800&q=85',
+    image: 'https://images.pexels.com/photos/7511741/pexels-photo-7511741.jpeg?auto=compress&cs=tinysrgb&w=800',
     fallback: '#7B6B8B',
     tag: '기억',
     title: '잊고 싶지 않은\n소중한 순간들',
     desc: '결혼, 육아, 여행의 기억들.\n함께한 시간이 책이 되어 영원히 남습니다.',
   },
   {
-    image: 'https://images.unsplash.com/photo-1517048676732-d65bc937f952?w=800&q=85',
+    image: 'https://images.pexels.com/photos/7414313/pexels-photo-7414313.jpeg?auto=compress&cs=tinysrgb&w=800',
     fallback: '#5B6B7B',
     tag: '역사',
     title: '우리 가족의\n역사를 기록합니다',
@@ -309,10 +309,16 @@ export default function LandingPage() {
             background: 'linear-gradient(160deg, #3D2B1F 0%, #1A1410 60%, #2A1A12 100%)',
           }}>
             <img
-              src="https://images.unsplash.com/photo-1609220136736-443140cfeaa8?w=1200&q=85"
-              alt="할머니와 손녀가 함께 앨범을 보는 장면"
-              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 20%' }}
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              src="https://images.pexels.com/photos/7414284/pexels-photo-7414284.jpeg?auto=compress&cs=tinysrgb&w=1200"
+              alt="할머니와 손녀가 함께 책을 읽는 장면"
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 30%' }}
+              onError={(e) => {
+                const img = e.target as HTMLImageElement;
+                if (!img.dataset.fallback) {
+                  img.dataset.fallback = '1';
+                  img.src = 'https://images.pexels.com/photos/8088495/pexels-photo-8088495.jpeg?auto=compress&cs=tinysrgb&w=1200';
+                }
+              }}
             />
             <div style={{
               position: 'absolute', inset: 0,

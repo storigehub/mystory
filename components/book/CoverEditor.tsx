@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useBook, CoverTemplateId } from '@/lib/book-context';
+import { compressImage } from '@/lib/compress-image';
 
 /* ── 디자인 토큰 ── */
 const SERIF  = "'Noto Serif KR', Georgia, serif";
@@ -238,12 +239,14 @@ export default function CoverEditor({ onClose }: CoverEditorProps) {
 
   const handleFileUpload = useCallback(async (file: File) => {
     if (!file.type.startsWith('image/')) { setUploadError('이미지 파일만 업로드 가능합니다'); return; }
-    if (file.size > 8 * 1024 * 1024) { setUploadError('파일 크기는 8MB 이하여야 합니다'); return; }
+    if (file.size > 20 * 1024 * 1024) { setUploadError('파일 크기는 20MB 이하여야 합니다'); return; }
     setUploading(true);
     setUploadError('');
     try {
+      // 4.5MB Vercel 제한 대응: 업로드 전 클라이언트 압축
+      const compressed = await compressImage(file);
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', compressed);
       const res = await fetch('/api/upload/photo', { method: 'POST', body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '업로드 실패');
