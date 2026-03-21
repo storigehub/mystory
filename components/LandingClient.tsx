@@ -12,14 +12,36 @@ const OnboardingModal = dynamic(() => import('@/components/OnboardingModal'), { 
 /* ─── 스크롤 reveal 훅 ──────────────────────────────────── */
 function useReveal() {
   useEffect(() => {
-    const els = document.querySelectorAll('.reveal, .reveal-scale');
+    const els = document.querySelectorAll('.reveal,.reveal-scale,.reveal-left,.reveal-right,.reveal-blur');
     const io = new IntersectionObserver(
-      (entries) => entries.forEach((e) => { if (e.isIntersecting) e.target.classList.add('visible'); }),
-      { threshold: 0.12 }
+      (entries) => entries.forEach((e) => {
+        if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); }
+      }),
+      { threshold: 0, rootMargin: '-40px 0px' }
     );
     els.forEach((el) => io.observe(el));
     return () => io.disconnect();
   }, []);
+}
+
+/* ─── 히어로 패럴랙스 훅 ──────────────────────────────────── */
+function useHeroParallax() {
+  const ref = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const section = el.closest('section');
+    const update = () => {
+      if (!section) return;
+      const rect = section.getBoundingClientRect();
+      const t = Math.max(0, Math.min(1, -rect.top / (rect.height * 0.85)));
+      el.style.transform = `translateY(${t * 60}px)`;
+    };
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+    return () => window.removeEventListener('scroll', update);
+  }, []);
+  return ref;
 }
 
 /* ─── 정적 데이터 ───────────────────────────────────────── */
@@ -182,6 +204,7 @@ export default function LandingClient({ config }: { config: LandingConfig | null
   const isLoggedIn = status === 'authenticated';
 
   useReveal();
+  const heroImgRef = useHeroParallax();
 
   useEffect(() => { setHasSaved(state.chapters.length > 0); }, [state.chapters.length]);
 
@@ -341,9 +364,10 @@ export default function LandingClient({ config }: { config: LandingConfig | null
             background: 'linear-gradient(160deg, #3D2B1F 0%, #1A1410 60%, #2A1A12 100%)',
           }}>
             <img
+              ref={heroImgRef}
               src={hero.image}
               alt="히어로 이미지"
-              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 30%' }}
+              style={{ position: 'absolute', left: 0, right: 0, top: '-40px', width: '100%', height: 'calc(100% + 80px)', objectFit: 'cover', objectPosition: 'center 30%' }}
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
             />
             <div style={{
@@ -408,7 +432,7 @@ export default function LandingClient({ config }: { config: LandingConfig | null
             <div style={{ width: 52, height: 1, background: 'rgba(201,169,110,0.4)' }} />
           </div>
 
-          <h2 className="reveal" style={{
+          <h2 className="reveal-blur" style={{
             fontFamily: TOKENS.serif,
             fontSize: 'clamp(2rem, 5.5vw, 3.4rem)',
             fontWeight: 200, color: '#FAFAF8',
@@ -454,8 +478,10 @@ export default function LandingClient({ config }: { config: LandingConfig | null
           </div>
 
           <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', justifyContent: 'center' }}>
-            {pillars.map((p, i) => (
-              <div key={i} className={`card-hover img-zoom reveal reveal-delay-${i + 1}`} style={{
+            {pillars.map((p, i) => {
+              const cardAnim = ['reveal-left reveal-delay-1', 'reveal-blur reveal-delay-2', 'reveal-right reveal-delay-3'][i];
+              return (
+              <div key={i} className={`card-hover img-zoom ${cardAnim}`} style={{
                 flex: '1 1 280px', maxWidth: 340, borderRadius: 24,
                 overflow: 'hidden', boxShadow: '0 8px 40px rgba(0,0,0,0.14)',
                 position: 'relative', minHeight: 460, background: p.fallback, cursor: 'default',
@@ -487,7 +513,8 @@ export default function LandingClient({ config }: { config: LandingConfig | null
                   }}>{p.desc}</p>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -502,7 +529,7 @@ export default function LandingClient({ config }: { config: LandingConfig | null
 
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 0 }}>
             {STEPS.map((step, i) => (
-              <div key={i} className={`reveal reveal-delay-${i + 1}`} style={{
+              <div key={i} className={`reveal-blur reveal-delay-${i + 1}`} style={{
                 flex: '1 1 240px', maxWidth: 320,
                 textAlign: 'center', padding: '0 40px 40px',
                 position: 'relative',
@@ -571,7 +598,7 @@ export default function LandingClient({ config }: { config: LandingConfig | null
             gap: 16,
           }}>
             {/* CARD 0: 선물 — 대형 세로형, 1~2행 */}
-            <div className="card-hover img-zoom reveal" style={{
+            <div className="card-hover img-zoom reveal-left" style={{
               gridColumn: 1, gridRow: '1 / 3',
               borderRadius: 24, overflow: 'hidden',
               boxShadow: '0 8px 40px rgba(0,0,0,0.14)',
@@ -607,7 +634,7 @@ export default function LandingClient({ config }: { config: LandingConfig | null
 
             {/* CARD 1: 유산 — 오른쪽 1행 */}
             {[scenarios[1], scenarios[2]].map((s, i) => (
-              <div key={i} className={`card-hover img-zoom reveal reveal-delay-${i + 1}`} style={{
+              <div key={i} className={`card-hover img-zoom reveal-right reveal-delay-${i + 1}`} style={{
                 gridColumn: 2, gridRow: i + 1,
                 borderRadius: 20, overflow: 'hidden',
                 boxShadow: '0 6px 28px rgba(0,0,0,0.12)',
@@ -639,7 +666,7 @@ export default function LandingClient({ config }: { config: LandingConfig | null
             ))}
 
             {/* CARD 3: 역사 — 왼쪽 3행 */}
-            <div className="card-hover img-zoom reveal reveal-delay-2" style={{
+            <div className="card-hover img-zoom reveal reveal-delay-3" style={{
               gridColumn: 1, gridRow: 3,
               borderRadius: 20, overflow: 'hidden',
               boxShadow: '0 6px 28px rgba(0,0,0,0.12)',
@@ -670,7 +697,7 @@ export default function LandingClient({ config }: { config: LandingConfig | null
             </div>
 
             {/* CARD 4: 성찰 — 오른쪽 3행 */}
-            <div className="card-hover img-zoom reveal reveal-delay-3" style={{
+            <div className="card-hover img-zoom reveal-right reveal-delay-4" style={{
               gridColumn: 2, gridRow: 3,
               borderRadius: 20, overflow: 'hidden',
               boxShadow: '0 6px 28px rgba(0,0,0,0.12)',
@@ -839,7 +866,7 @@ export default function LandingClient({ config }: { config: LandingConfig | null
 
           <div style={{ borderTop: `1px solid ${TOKENS.border}` }}>
             {FAQS.map((faq, i) => (
-              <div key={i} className="reveal" style={{ borderBottom: `1px solid ${TOKENS.border}` }}>
+              <div key={i} className={`reveal reveal-delay-${i + 1}`} style={{ borderBottom: `1px solid ${TOKENS.border}` }}>
                 <button className="faq-btn" onClick={() => setOpenFaq(openFaq === i ? null : i)} style={{
                   width: '100%', display: 'flex', justifyContent: 'space-between',
                   alignItems: 'center', padding: '24px 8px', background: 'transparent',
