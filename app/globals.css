@@ -64,8 +64,10 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 @media(max-width:768px){
   .hero-split{flex-direction:column!important}
   .hero-split-img{min-height:52vh!important;order:-1;border-radius:0!important;margin-right:0!important}
+  /* 5-카드 그리드 모바일: 단일 컬럼, 명시적 배치 해제 */
   .scenario-asymmetric{grid-template-columns:1fr!important;grid-template-rows:auto!important}
-  .scenario-asymmetric>div:first-child{grid-row:auto!important}
+  .scenario-asymmetric>div{grid-column:auto!important;grid-row:auto!important;height:200px!important}
+  .scenario-asymmetric>div:first-child{min-height:240px!important;height:240px!important}
 }
 @media(max-width:639px){
   /* 히어로 텍스트 영역 모바일 패딩 */

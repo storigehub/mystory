@@ -88,7 +88,6 @@ const SCENARIOS = [
     tag: '선물',
     title: '부모님께 드리는\n가장 특별한 선물',
     desc: '평생의 이야기를 한 권의 책으로.\n자녀가 드릴 수 있는 가장 따뜻한 선물입니다.',
-    large: true,
   },
   {
     image: 'https://images.pexels.com/photos/8055130/pexels-photo-8055130.jpeg?auto=compress&cs=tinysrgb&w=800',
@@ -110,6 +109,13 @@ const SCENARIOS = [
     tag: '역사',
     title: '우리 가족의\n역사를 기록합니다',
     desc: '뿌리와 이야기, 가족만의 문화까지.\n아름다운 책으로 대대로 전해집니다.',
+  },
+  {
+    image: 'https://images.pexels.com/photos/5637738/pexels-photo-5637738.jpeg?auto=compress&cs=tinysrgb&w=800',
+    fallback: '#7A6858',
+    tag: '성찰',
+    title: '나를 돌아보는\n소중한 시간',
+    desc: '바쁘게 살아온 나의 삶을 조용히 돌아보며\n인생의 의미와 지혜를 글로 남깁니다.',
   },
 ];
 
@@ -532,63 +538,67 @@ export default function LandingPage() {
             <h2 style={SECTION_H2}>이런 분들께 권합니다</h2>
           </div>
 
-          {/* 비대칭 그리드: 왼쪽 큰 카드 + 오른쪽 3개 */}
+          {/* 5-카드 비대칭 그리드
+               [  CARD 0 (대형)  ] [ CARD 1 ]
+               [  CARD 0 (대형)  ] [ CARD 2 ]
+               [ CARD 3 (소형)   ] [ CARD 4 ] */}
           <div className="scenario-asymmetric" style={{
             display: 'grid',
             gridTemplateColumns: '1.4fr 1fr',
-            gridTemplateRows: 'auto auto',
+            gridTemplateRows: '224px 224px 176px',
             gap: 16,
           }}>
-            {/* 대형 카드 */}
+            {/* CARD 0: 선물 — 대형 세로형, 1~2행 */}
             <div className="card-hover img-zoom reveal" style={{
-              gridRow: '1 / 3',
+              gridColumn: 1, gridRow: '1 / 3',
               borderRadius: 24, overflow: 'hidden',
               boxShadow: '0 8px 40px rgba(0,0,0,0.14)',
-              position: 'relative', minHeight: 520,
+              position: 'relative',
               background: SCENARIOS[0].fallback, cursor: 'default',
             }}>
               <img src={SCENARIOS[0].image} alt={SCENARIOS[0].tag} style={{
                 position: 'absolute', inset: 0, width: '100%', height: '100%',
-                objectFit: 'cover', objectPosition: 'center 25%',
+                objectFit: 'cover', objectPosition: 'center 30%',
               }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
               <div style={{
                 position: 'absolute', inset: 0,
-                background: 'linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.7) 100%)',
+                background: 'linear-gradient(180deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.72) 100%)',
               }} />
-              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '36px 36px 44px', color: '#FFF' }}>
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '32px 32px 40px', color: '#FFF' }}>
                 <span style={{
                   display: 'inline-block', background: 'rgba(255,255,255,0.18)',
                   backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.28)',
                   borderRadius: 40, padding: '4px 14px', fontSize: 11,
-                  letterSpacing: 1.5, fontFamily: TOKENS.sans, fontWeight: 500, marginBottom: 14,
+                  letterSpacing: 1.5, fontFamily: TOKENS.sans, fontWeight: 500, marginBottom: 12,
                 }}>{SCENARIOS[0].tag}</span>
                 <h3 style={{
-                  fontFamily: TOKENS.serif, fontSize: 'clamp(1.2rem, 2.5vw, 1.5rem)',
-                  fontWeight: 300, marginBottom: 12, letterSpacing: '-0.025em',
+                  fontFamily: TOKENS.serif, fontSize: 'clamp(1.15rem, 2.2vw, 1.45rem)',
+                  fontWeight: 300, marginBottom: 10, letterSpacing: '-0.025em',
                   lineHeight: 1.35, whiteSpace: 'pre-line', wordBreak: 'keep-all',
                 }}>{SCENARIOS[0].title}</h3>
                 <p style={{
-                  fontSize: 14, lineHeight: 1.8, color: 'rgba(255,255,255,0.8)',
+                  fontSize: 13.5, lineHeight: 1.8, color: 'rgba(255,255,255,0.78)',
                   fontFamily: TOKENS.sans, fontWeight: 300, wordBreak: 'keep-all', whiteSpace: 'pre-line',
                 }}>{SCENARIOS[0].desc}</p>
               </div>
             </div>
 
-            {/* 오른쪽 3개 소형 카드 */}
-            {SCENARIOS.slice(1).map((s, i) => (
+            {/* CARD 1: 유산 — 오른쪽 1행 */}
+            {[SCENARIOS[1], SCENARIOS[2]].map((s, i) => (
               <div key={i} className={`card-hover img-zoom reveal reveal-delay-${i + 1}`} style={{
+                gridColumn: 2, gridRow: i + 1,
                 borderRadius: 20, overflow: 'hidden',
                 boxShadow: '0 6px 28px rgba(0,0,0,0.12)',
-                position: 'relative', height: 160,
+                position: 'relative',
                 background: s.fallback, cursor: 'default',
               }}>
                 <img src={s.image} alt={s.tag} style={{
                   position: 'absolute', inset: 0, width: '100%', height: '100%',
-                  objectFit: 'cover', objectPosition: 'center 30%',
+                  objectFit: 'cover', objectPosition: 'center 25%',
                 }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                 <div style={{
                   position: 'absolute', inset: 0,
-                  background: 'linear-gradient(120deg, rgba(0,0,0,0.68) 0%, rgba(0,0,0,0.28) 100%)',
+                  background: 'linear-gradient(160deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.72) 100%)',
                 }} />
                 <div style={{ position: 'absolute', inset: 0, padding: '20px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', color: '#FFF' }}>
                   <span style={{
@@ -598,13 +608,75 @@ export default function LandingPage() {
                     letterSpacing: 1, fontFamily: TOKENS.sans, marginBottom: 8,
                   }}>{s.tag}</span>
                   <h3 style={{
-                    fontFamily: TOKENS.serif, fontSize: 14, fontWeight: 300,
+                    fontFamily: TOKENS.serif, fontSize: 15, fontWeight: 300,
                     letterSpacing: '-0.015em', lineHeight: 1.4,
                     whiteSpace: 'pre-line', wordBreak: 'keep-all',
                   }}>{s.title}</h3>
                 </div>
               </div>
             ))}
+
+            {/* CARD 3: 역사 — 왼쪽 3행 */}
+            <div className="card-hover img-zoom reveal reveal-delay-2" style={{
+              gridColumn: 1, gridRow: 3,
+              borderRadius: 20, overflow: 'hidden',
+              boxShadow: '0 6px 28px rgba(0,0,0,0.12)',
+              position: 'relative',
+              background: SCENARIOS[3].fallback, cursor: 'default',
+            }}>
+              <img src={SCENARIOS[3].image} alt={SCENARIOS[3].tag} style={{
+                position: 'absolute', inset: 0, width: '100%', height: '100%',
+                objectFit: 'cover', objectPosition: 'center 35%',
+              }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+              <div style={{
+                position: 'absolute', inset: 0,
+                background: 'linear-gradient(160deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.72) 100%)',
+              }} />
+              <div style={{ position: 'absolute', inset: 0, padding: '18px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', color: '#FFF' }}>
+                <span style={{
+                  display: 'inline-block', background: 'rgba(255,255,255,0.18)',
+                  backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.25)',
+                  borderRadius: 40, padding: '3px 11px', fontSize: 10,
+                  letterSpacing: 1, fontFamily: TOKENS.sans, marginBottom: 8,
+                }}>{SCENARIOS[3].tag}</span>
+                <h3 style={{
+                  fontFamily: TOKENS.serif, fontSize: 15, fontWeight: 300,
+                  letterSpacing: '-0.015em', lineHeight: 1.4,
+                  whiteSpace: 'pre-line', wordBreak: 'keep-all',
+                }}>{SCENARIOS[3].title}</h3>
+              </div>
+            </div>
+
+            {/* CARD 4: 성찰 — 오른쪽 3행 */}
+            <div className="card-hover img-zoom reveal reveal-delay-3" style={{
+              gridColumn: 2, gridRow: 3,
+              borderRadius: 20, overflow: 'hidden',
+              boxShadow: '0 6px 28px rgba(0,0,0,0.12)',
+              position: 'relative',
+              background: SCENARIOS[4].fallback, cursor: 'default',
+            }}>
+              <img src={SCENARIOS[4].image} alt={SCENARIOS[4].tag} style={{
+                position: 'absolute', inset: 0, width: '100%', height: '100%',
+                objectFit: 'cover', objectPosition: 'center 30%',
+              }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+              <div style={{
+                position: 'absolute', inset: 0,
+                background: 'linear-gradient(160deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.72) 100%)',
+              }} />
+              <div style={{ position: 'absolute', inset: 0, padding: '18px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', color: '#FFF' }}>
+                <span style={{
+                  display: 'inline-block', background: 'rgba(255,255,255,0.18)',
+                  backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.25)',
+                  borderRadius: 40, padding: '3px 11px', fontSize: 10,
+                  letterSpacing: 1, fontFamily: TOKENS.sans, marginBottom: 8,
+                }}>{SCENARIOS[4].tag}</span>
+                <h3 style={{
+                  fontFamily: TOKENS.serif, fontSize: 15, fontWeight: 300,
+                  letterSpacing: '-0.015em', lineHeight: 1.4,
+                  whiteSpace: 'pre-line', wordBreak: 'keep-all',
+                }}>{SCENARIOS[4].title}</h3>
+              </div>
+            </div>
           </div>
         </div>
       </section>
