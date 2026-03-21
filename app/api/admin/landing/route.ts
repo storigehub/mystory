@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { revalidatePath } from 'next/cache';
 
 export const runtime = 'nodejs';
 
@@ -51,6 +52,9 @@ export async function POST(req: NextRequest) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    // ISR 캐시 무효화 → 다음 방문자가 즉시 새 설정 반영
+    revalidatePath('/');
 
     return NextResponse.json({ ok: true });
   } catch (err) {
