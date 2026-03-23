@@ -1,6 +1,6 @@
 # 나의이야기 (My Story) — Claude Code 인계 문서
 
-> **최종 업데이트**: 2026-03-19 (Phase 8 완료)
+> **최종 업데이트**: 2026-03-23 (Phase 9 디자인 완료)
 > **작성 환경**: Claude Code (CLI) — claude-sonnet-4-6
 > ⚠️ 모든 개발은 Claude Code에서 `/mystory` 폴더를 직접 편집한다.
 
@@ -49,9 +49,10 @@ app/
 ├── shared/[id]/page.tsx        ← 공개 책 읽기 (인증 불필요, 토큰 지원)
 ├── interviewer/[id]/page.tsx   ← 인터뷰어 전용 페이지 (질문 추가)
 │                                  ※ Phase 8: Supabase Realtime 추가 (저자 답변 실시간 표시)
-├── admin/page.tsx              ← 관리자 메인 대시보드 (통계 + 책 목록 + 마이그레이션)
+├── admin/page.tsx              ← 관리자 메인 대시보드 (통계 + 책 목록 + 마이그레이션 + 랜딩 관리 링크)
 │                                  ※ Phase 8: base64 사진 마이그레이션 카드 추가
 ├── admin/settings/page.tsx     ← 관리자 STT·UI 설정
+├── admin/landing/page.tsx      ← 관리자 랜딩 CMS (히어로/WHY/FOR WHOM 이미지·문구 편집) ← Phase 9 신규
 └── api/
     ├── ai/
     │   ├── chat/route.ts               ← GPT-4o-mini 인터뷰어 (론 서로게이트 sanitize)
@@ -70,15 +71,18 @@ app/
     ├── settings/route.ts               ← 서비스 설정 공개 조회 (sttMode 등)
     ├── admin/settings/route.ts         ← 관리자 설정 CRUD (비밀번호 인증)
     ├── admin/stats/route.ts            ← 서비스 통계 API
-    └── admin/migrate-photos/route.ts   ← base64 사진 → Cloudinary 일괄 마이그레이션 ← Phase 8 신규
+    ├── admin/migrate-photos/route.ts   ← base64 사진 → Cloudinary 일괄 마이그레이션 ← Phase 8 신규
+    └── admin/landing/route.ts          ← 랜딩 CMS GET/POST + revalidatePath('/') ← Phase 9 신규
 
 components/
 ├── write/
 │   ├── ChatEditor.tsx    ← AI 대화 인터뷰 (인터뷰어 메시지 보라색, maxDurationSec)
-│   └── NormalEditor.tsx  ← 자유 글쓰기 (Cloudinary 업로드, maxDurationSec)
+│   └── NormalEditor.tsx  ← 자유 글쓰기 (Cloudinary 업로드, compressImage, maxDurationSec)
 ├── book/
 │   ├── FlipBook.tsx      ← react-pageflip 페이지 넘기기
-│   └── PrintBook.tsx     ← PDF 인쇄 전용 레이아웃
+│   ├── PrintBook.tsx     ← PDF 인쇄 전용 레이아웃
+│   └── CoverEditor.tsx   ← 책 표지 편집 (6종 템플릿 + 사진 커버, compressImage)
+├── LandingClient.tsx     ← 랜딩 페이지 클라이언트 컴포넌트 (Server→Client props) ← Phase 9 신규
 └── OnboardingModal.tsx   ← 첫 방문자 환영 모달 (localStorage 기반) ← Phase 8 신규
 
 lib/
@@ -144,6 +148,32 @@ config/
   - `resend` 패키지 설치 완료 (v6.9.4)
   - ⚠️ **`RESEND_API_KEY` 미설정** — 아래 설정 필요 항목 참고
 
+### Phase 9 (Claude Code — 2026-03-19~21)
+- [x] **사진 업로드 500 에러 수정**
+  - `lib/compress-image.ts` 신규 생성 — Canvas 기반 클라이언트 압축 (목표 ≤3MB, 최대 1920px)
+  - Vercel Serverless Function 4.5MB 요청 한도 대응
+  - `NormalEditor`, `CoverEditor` 양쪽 적용
+- [x] **랜딩 페이지 이미지 전면 교체**
+  - 히어로 + WHY 3개 + FOR WHOM 4→5개 카드 전체를 Pexels CDN 한국인/아시아인 사진으로 교체
+  - Unsplash → Pexels 이전 (국내 네트워크 안정성)
+- [x] **FOR WHOM 5-카드 비대칭 그리드**
+  - 4카드 → 5카드 확장, 대형 좌측 카드(2행 span) + 우측 2×2 배치
+  - `gridTemplateColumns: '1.1fr 1fr'`, `gridTemplateRows: '224px 224px 176px'`
+  - 모바일: 단일 컬럼 전환, `grid-column/row: auto` 리셋
+- [x] **관리자 랜딩 CMS**
+  - `app/admin/landing/page.tsx`: 히어로/WHY/FOR WHOM 이미지·문구 편집 UI
+  - `app/api/admin/landing/route.ts`: Supabase `site_config` 저장 + ISR 온디맨드 재검증
+  - Supabase `site_config` 테이블 신규 생성 (MCP 마이그레이션)
+- [x] **랜딩 ISR + 온디맨드 재검증 (깜빡임 제거)**
+  - `app/page.tsx` → Server Component (`export const revalidate = 3600`)
+  - 서버에서 Supabase config 조회 후 `<LandingClient config={config} />` props 전달
+  - 관리자 저장 시 `revalidatePath('/')` → CDN 즉시 무효화 → 클라이언트 fetch 없음
+- [x] **스크롤 애니메이션 다이나믹 강화**
+  - `.reveal-left`, `.reveal-right`, `.reveal-blur` 방향별 진입 클래스 추가
+  - `will-change: transform, opacity` + `backface-visibility: hidden` GPU 가속
+  - delay 3단계 → 5단계, 이징 0.75s → 0.95s
+  - 랜딩 섹션별 reveal 클래스 교차 배치 (좌우/블러 교번)
+
 ### Phase 8 (Claude Code — 2026-03-19)
 - [x] **랜딩 페이지 리디자인**
   - HOW IT WORKS 섹션: 이모지 제거 → 아웃라인 원 + 워터마크 숫자(opacity 0.045) + 영문 라벨(CHOOSE/TALK/FINISH)
@@ -180,35 +210,41 @@ config/
 
 ## ⚠️ 설정 필요 항목 (개발 재개 전 확인)
 
-### 1. Resend 이메일 서비스 설정 (미완료)
-이메일 초대 기능은 코드 완성, API 키만 없는 상태.
+### 1. Resend 이메일 서비스 ✅ 설정 완료
+- `RESEND_API_KEY` Vercel 환경변수 설정 완료 (2026-03-18)
+- 발신자 주소: 현재 `onboarding@resend.dev` (Resend 기본 주소, 테스트용)
+- **추후 필요**: 자체 도메인 인증 → `RESEND_FROM_EMAIL` 환경변수 추가
+  - Resend 대시보드 → Domains → 도메인 DNS 인증
+  - `.env.local`에도 `RESEND_API_KEY` 추가 필요 (로컬 테스트용)
 
-**설정 순서:**
-1. [resend.com](https://resend.com) 가입 (무료: 월 3,000건)
-2. API Keys 메뉴 → `+ Create API Key` → 키 복사
-3. Vercel에 환경변수 추가:
-   ```bash
-   printf 'your_resend_api_key' | vercel env add RESEND_API_KEY production
-   vercel --prod
-   ```
-4. `.env.local`에도 추가: `RESEND_API_KEY=re_xxxx...`
+### 2. ⚠️ messages.type DB 체크 제약 버그
+Supabase `messages` 테이블의 type 컬럼 체크 제약이 `'interviewer'` 타입을 허용하지 않음.
 
-**발신자 주소 관련:**
-- 현재: `onboarding@resend.dev` (Resend 기본 주소, 테스트용)
-- 추후: 자체 도메인 인증 필요 → `RESEND_FROM_EMAIL` 환경변수로 변경
-  - Resend 대시보드 → Domains → 도메인 추가 및 DNS 인증
-  - 예: `noreply@mystory.co.kr`
+```sql
+-- 현재 제약 (버그): 'interviewer' 없음
+type = ANY (ARRAY['ai', 'user', 'photo', 'system'])
 
-### 2. Supabase SQL 마이그레이션 (이미 실행 완료 — 확인용)
+-- 수정 필요:
+ALTER TABLE messages DROP CONSTRAINT messages_type_check;
+ALTER TABLE messages ADD CONSTRAINT messages_type_check
+  CHECK (type = ANY (ARRAY['ai', 'user', 'photo', 'system', 'interviewer']));
+```
+
+인터뷰어 기능 사용 전 반드시 위 마이그레이션 실행 필요.
+
+### 4. Supabase SQL 마이그레이션 (이미 실행 완료 — 확인용)
 ```sql
 -- Phase 6
 ALTER TABLE books ADD COLUMN IF NOT EXISTS is_public boolean DEFAULT false;
 ALTER TABLE books ADD COLUMN IF NOT EXISTS share_token uuid;
 -- Phase 8 (Supabase MCP로 실행 완료)
 ALTER TABLE books ADD COLUMN IF NOT EXISTS interviewer_token uuid;
+-- Phase 9 (Supabase MCP로 실행 완료)
+CREATE TABLE IF NOT EXISTS site_config (id text PRIMARY KEY, data jsonb DEFAULT '{}', updated_at timestamptz DEFAULT now());
+-- ⚠️ 아직 미실행: messages.type 체크 제약 수정 (위 항목 2 참고)
 ```
 
-### 3. Supabase Realtime 설정 (Phase 7, 이미 완료)
+### 5. Supabase Realtime 설정 (Phase 7, 이미 완료)
 - `messages` 테이블 Realtime: ✅ 활성화됨
 - RLS SELECT 정책: ✅ 추가됨 (`Allow read messages` — USING true)
 
@@ -234,14 +270,15 @@ CLOUDINARY_API_KEY=156597567526248
 CLOUDINARY_API_SECRET=iXVRvhSgSjv3mM0T6nnz5VfXgRw
 CLOUDINARY_URL=cloudinary://156597567526248:iXVRvhSgSjv3mM0T6nnz5VfXgRw@dgvrgxq72
 ADMIN_PASSWORD=strg1128!@
-RESEND_API_KEY=          ← 미설정, 위 설정 순서 참고
-RESEND_FROM_EMAIL=       ← 미설정, 도메인 인증 후 추가 (없으면 onboarding@resend.dev 사용)
+RESEND_API_KEY=re_xxxx...  ← ✅ Vercel에 설정 완료, 로컬도 추가 필요
+RESEND_FROM_EMAIL=         ← 미설정, 도메인 인증 후 추가 (없으면 onboarding@resend.dev 사용)
 ```
 
 ### Vercel (production) — 설정 완료 항목
 - 위 모든 항목 + `NEXTAUTH_URL=https://mystory-khaki.vercel.app`
 - `ADMIN_PASSWORD=strg1128!@` ✅ 설정 완료
-- `RESEND_API_KEY` ⚠️ 미설정
+- `RESEND_API_KEY` ✅ 설정 완료 (2026-03-18)
+- `RESEND_FROM_EMAIL` ⚠️ 미설정 (현재 onboarding@resend.dev 사용)
 
 ---
 
@@ -250,13 +287,16 @@ RESEND_FROM_EMAIL=       ← 미설정, 도메인 인증 후 추가 (없으면 o
 ```sql
 books (
   id uuid PK,
-  user_id uuid FK → users,
-  title text,
-  author text,
+  user_id text,
+  title text DEFAULT '나의 이야기',
+  author text DEFAULT '',
+  settings jsonb DEFAULT '{}',
   cover_template text DEFAULT 'classic',
-  is_public boolean DEFAULT false,    ← Phase 6 추가
-  share_token uuid,                   ← Phase 6 추가 (열람 전용)
-  interviewer_token uuid,             ← Phase 8 추가 (질문 추가 권한)
+  cover_photo_url text DEFAULT '',   ← Phase 5 추가 (표지 사진)
+  cover_layout text DEFAULT 'topleft', ← Phase 5 추가 (표지 레이아웃)
+  is_public boolean DEFAULT false,   ← Phase 6 추가
+  share_token uuid,                  ← Phase 6 추가 (열람 전용)
+  interviewer_token uuid,            ← Phase 8 추가 (질문 추가 권한)
   created_at, updated_at
 )
 
@@ -265,17 +305,24 @@ chapters (
   book_id uuid FK → books CASCADE,
   topic_id text, title text,
   sort_order int, is_custom bool,
-  mode text DEFAULT 'chat',
-  prose text, is_done bool
+  mode text DEFAULT 'chat',  -- CHECK: 'chat' | 'normal'
+  prose text DEFAULT '', is_done bool
 )
 
 messages (
   id uuid PK,
   chapter_id uuid FK → chapters CASCADE,
-  type text,   -- 'user' | 'ai' | 'photo' | 'interviewer'
-  text text, sort_order int
+  type text,   -- ⚠️ 현재 체크 제약: 'ai'|'user'|'photo'|'system' ('interviewer' 미포함 → 수정 필요)
+  text text DEFAULT '', photo_url text, sort_order int
 )
 -- ※ Realtime 활성화됨 / RLS SELECT 정책 추가됨 (Phase 7)
+
+site_config (
+  id text PK,   -- 'landing' 키로 랜딩 CMS 설정 저장
+  data jsonb DEFAULT '{}',
+  updated_at timestamptz
+)
+-- ※ Phase 9 추가, RLS 공개 읽기 정책 적용됨
 
 photos (
   id uuid PK,
@@ -357,10 +404,12 @@ source==='ai'          → type: 'ai'
 |------|------|------|
 | `/admin` | 통계 카드 + 전체 책 목록 + 검색 + 마이그레이션 버튼 | ADMIN_PASSWORD |
 | `/admin/settings` | STT 모드·API키·UI 설정 | ADMIN_PASSWORD |
+| `/admin/landing` | 랜딩 CMS (이미지·문구 편집) ← Phase 9 | ADMIN_PASSWORD |
 | `/api/admin/stats` | 서비스 통계 JSON | x-admin-password 헤더 |
 | `/api/admin/settings` | 설정 GET/POST | x-admin-password 헤더 |
 | `GET /api/admin/migrate-photos` | base64 사진 대기 수 확인 | x-admin-password 헤더 |
 | `POST /api/admin/migrate-photos` | base64→Cloudinary 일괄 변환 | x-admin-password 헤더 |
+| `GET/POST /api/admin/landing` | 랜딩 config 조회/저장 + ISR 재검증 ← Phase 9 | x-admin-password 헤더 |
 
 ### 한글 IME 처리
 모든 텍스트 입력창에 `composingRef` + `onCompositionStart/End` 패턴 필수.
@@ -389,13 +438,16 @@ interface Message {
 
 ## 🚧 다음 작업 목록 (우선순위 순)
 
-### 즉시 필요
-- [ ] **Resend API 키 설정** — resend.com 가입 후 `RESEND_API_KEY` Vercel에 추가 (위 설정 항목 참고)
+### 즉시 필요 (버그)
+- [ ] **messages.type 체크 제약 수정** — `'interviewer'` 타입 허용 추가 (위 항목 2 SQL 실행)
+  - 현재 인터뷰어 질문 INSERT 시 DB 오류 가능성 있음
+- [ ] **RESEND_API_KEY 로컬 추가** — `.env.local`에 Vercel과 동일한 키 추가 (로컬 이메일 테스트용)
 
 ### 단기 — 기능
 - [ ] **Resend 발신자 도메인 인증** — `noreply@[커스텀도메인]` 설정 (Resend 대시보드 → Domains)
-- [ ] **OpenAI quota 충전** — 현재 소진, 로컬 질문 풀 폴백 중
-- [ ] **Whisper STT 검증** — 실제 음성 인식 end-to-end 테스트 (RESEND 설정 완료 후 진행)
+- [ ] **OpenAI quota 충전** — 현재 소진 시 로컬 질문 풀 폴백 중
+- [ ] **Whisper STT 검증** — 실제 음성 인식 end-to-end 테스트
+- [ ] **관리자 랜딩 CMS 초기 데이터 입력** — `/admin/landing`에서 "기본값 초기화" 버튼으로 site_config 생성
 
 ### 중기
 - [ ] **base64 사진 마이그레이션 실행** — 관리자 대시보드 로그인 후 마이그레이션 버튼 클릭
@@ -434,7 +486,9 @@ git push origin main
 | 인증 | NextAuth.js v4 (이메일/Google/Kakao) |
 | DB | Supabase (PostgreSQL + Realtime 양방향) |
 | 사진 저장 | Cloudinary (base64 마이그레이션 API 포함) |
-| 이메일 | Resend (v6.9.4) — API 키 미설정 상태 |
+| 이메일 | Resend (v6.9.4) — API 키 설정 완료, 발신자 도메인 미인증 |
+| 이미지 압축 | Canvas API (lib/compress-image.ts) — 클라이언트 사이드 |
+| 랜딩 CMS | Supabase site_config + ISR 온디맨드 재검증 |
 | 배포 | Vercel |
 | 음성 | Web Speech API (browser) + OpenAI Whisper STT |
 | PDF | 브라우저 window.print() + CSS @media print |
@@ -456,6 +510,7 @@ git push origin main
 | 파일 | 내용 |
 |------|------|
 | `docs/mystory-progress-report.md` | Phase별 전체 진행 현황 |
+| `docs/design-guide.md` | 디자인 시스템 가이드 (색상·타이포·애니메이션·레이아웃) |
 | `docs/mystory-ux-review.md` | UX 점검 + 상세 계획 |
 | `docs/mystory-dev-issues.md` | 관리자 STT 설정 API 상세 설계 |
 | `config/settings.json` | STT·UI 서비스 설정 (관리자 페이지에서 수정) |
