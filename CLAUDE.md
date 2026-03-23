@@ -438,6 +438,8 @@ interface Message {
 - [ ] **가족 초대 이메일 다중 발송** — 현재 1건씩 → 여러 명 동시 발송 UI
 
 ### 장기
+- [ ] **AI 토큰 최적화** — 실사용 테스트 후 필요 시 `docs/token-optimization-strategies.md` 참고
+  - 단계 1: 방안 C (메시지 압축, 코드 5줄) → 단계 2: 방안 A (슬라이딩 윈도우)
 - [ ] **POD 인쇄 연동** — 외부 출판사 API 연동
 - [ ] **Supabase Auth 마이그레이션** — 현재 NextAuth → Supabase Auth 통합 검토
 
@@ -495,6 +497,7 @@ git push origin main
 |------|------|
 | `docs/mystory-progress-report.md` | Phase별 전체 진행 현황 |
 | `docs/design-guide.md` | 디자인 시스템 가이드 (색상·타이포·애니메이션·레이아웃) |
+| `docs/token-optimization-strategies.md` | AI 토큰 최적화 전략 (슬라이딩 윈도우·하이브리드·압축) |
 | `docs/mystory-ux-review.md` | UX 점검 + 상세 계획 |
 | `docs/mystory-dev-issues.md` | 관리자 STT 설정 API 상세 설계 |
 | `config/settings.json` | STT·UI 서비스 설정 (관리자 페이지에서 수정) |
