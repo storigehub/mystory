@@ -217,21 +217,6 @@ config/
   - Resend 대시보드 → Domains → 도메인 DNS 인증
   - `.env.local`에도 `RESEND_API_KEY` 추가 필요 (로컬 테스트용)
 
-### 2. ⚠️ messages.type DB 체크 제약 버그
-Supabase `messages` 테이블의 type 컬럼 체크 제약이 `'interviewer'` 타입을 허용하지 않음.
-
-```sql
--- 현재 제약 (버그): 'interviewer' 없음
-type = ANY (ARRAY['ai', 'user', 'photo', 'system'])
-
--- 수정 필요:
-ALTER TABLE messages DROP CONSTRAINT messages_type_check;
-ALTER TABLE messages ADD CONSTRAINT messages_type_check
-  CHECK (type = ANY (ARRAY['ai', 'user', 'photo', 'system', 'interviewer']));
-```
-
-인터뷰어 기능 사용 전 반드시 위 마이그레이션 실행 필요.
-
 ### 4. Supabase SQL 마이그레이션 (이미 실행 완료 — 확인용)
 ```sql
 -- Phase 6
@@ -312,7 +297,7 @@ chapters (
 messages (
   id uuid PK,
   chapter_id uuid FK → chapters CASCADE,
-  type text,   -- ⚠️ 현재 체크 제약: 'ai'|'user'|'photo'|'system' ('interviewer' 미포함 → 수정 필요)
+  type text,   -- ✅ 체크 제약: 'ai'|'user'|'photo'|'system'|'interviewer'
   text text DEFAULT '', photo_url text, sort_order int
 )
 -- ※ Realtime 활성화됨 / RLS SELECT 정책 추가됨 (Phase 7)
@@ -438,9 +423,8 @@ interface Message {
 
 ## 🚧 다음 작업 목록 (우선순위 순)
 
-### 즉시 필요 (버그)
-- [ ] **messages.type 체크 제약 수정** — `'interviewer'` 타입 허용 추가 (위 항목 2 SQL 실행)
-  - 현재 인터뷰어 질문 INSERT 시 DB 오류 가능성 있음
+### 즉시 필요
+- [x] **messages.type 체크 제약 수정** ✅ 완료 (2026-03-23)
 - [ ] **RESEND_API_KEY 로컬 추가** — `.env.local`에 Vercel과 동일한 키 추가 (로컬 이메일 테스트용)
 
 ### 단기 — 기능
