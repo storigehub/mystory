@@ -1,6 +1,6 @@
 # 나의이야기 (My Story) — Claude Code 인계 문서
 
-> **최종 업데이트**: 2026-03-23 (Phase 9 디자인 완료)
+> **최종 업데이트**: 2026-03-24 (전체 현황 리뷰 완료)
 > **작성 환경**: Claude Code (CLI) — claude-sonnet-4-6
 > ⚠️ 모든 개발은 Claude Code에서 `/mystory` 폴더를 직접 편집한다.
 
@@ -423,25 +423,39 @@ interface Message {
 
 ## 🚧 다음 작업 목록 (우선순위 순)
 
-### 즉시 필요
+> 상세 현황: `docs/mystory-progress-report.md` 참고
+
+### 🔴 즉시 필요 (운영 안정화)
 - [x] **messages.type 체크 제약 수정** ✅ 완료 (2026-03-23)
-- [ ] **RESEND_API_KEY 로컬 추가** — `.env.local`에 Vercel과 동일한 키 추가 (로컬 이메일 테스트용)
+- [ ] **RESEND_API_KEY 로컬 추가** — `.env.local`에 Vercel과 동일한 키 추가
+- [ ] **관리자 랜딩 CMS 초기 데이터 입력** — `/admin/landing`에서 "기본값 초기화" 클릭 → site_config 생성
+- [ ] **Whisper STT end-to-end 검증** — 실제 음성 녹음 → 인식 → 입력 전 과정 테스트
+- [ ] **base64 사진 마이그레이션 실행** — 관리자 대시보드 → 마이그레이션 버튼 클릭
 
-### 단기 — 기능
-- [ ] **Resend 발신자 도메인 인증** — `noreply@[커스텀도메인]` 설정 (Resend 대시보드 → Domains)
-- [ ] **OpenAI quota 충전** — 현재 소진 시 로컬 질문 풀 폴백 중
-- [ ] **Whisper STT 검증** — 실제 음성 인식 end-to-end 테스트
-- [ ] **관리자 랜딩 CMS 초기 데이터 입력** — `/admin/landing`에서 "기본값 초기화" 버튼으로 site_config 생성
+### 🟡 단기 — UX 보완
+- [ ] **책 제목/저자 편집 UI** — /book 또는 /write 내에서 제목·저자 수정 가능하게
+- [ ] **챕터 완성 상태 자동화** — "이야기 완성하기" 클릭 시 `is_done = true` 자동 처리
+- [ ] **비회원 → 회원 전환 시 데이터 이전** — 로그인 후 localStorage 데이터를 DB로 이전
+- [ ] **OGP 메타태그 전체 페이지 적용** — 랜딩 / /my / /book 페이지 og:title, og:image 추가
+- [ ] **Resend 발신자 도메인 인증** — `noreply@[커스텀도메인]` (Resend 대시보드 → Domains)
+- [ ] **OpenAI quota 관리** — 소진 시 알림 + quota 충전
 
-### 중기
-- [ ] **base64 사진 마이그레이션 실행** — 관리자 대시보드 로그인 후 마이그레이션 버튼 클릭
-- [ ] **가족 초대 이메일 다중 발송** — 현재 1건씩 → 여러 명 동시 발송 UI
+### 🟠 중기 — 기능 확장
+- [ ] **결제 시스템** — Stripe 또는 토스페이 연동 (구독/단건 결제 모델)
+- [ ] **AI 토큰 최적화** — `docs/token-optimization-strategies.md` 참고
+  - 1단계: 방안 C (오래된 메시지 80자 truncate, 코드 5줄)
+  - 2단계: 방안 A (슬라이딩 윈도우 + 요약 컨텍스트)
+- [ ] **가족 초대 이메일 다중 발송** — 현재 1건 → 여러 명 동시 발송 UI
+- [ ] **챕터 간 문맥 연결** — 전체 생애사 맥락을 AI가 요약·연결하는 기능
+- [ ] **관리자 사용자 관리** — 회원 탈퇴·이메일 발송 기능
 
-### 장기
-- [ ] **AI 토큰 최적화** — 실사용 테스트 후 필요 시 `docs/token-optimization-strategies.md` 참고
-  - 단계 1: 방안 C (메시지 압축, 코드 5줄) → 단계 2: 방안 A (슬라이딩 윈도우)
-- [ ] **POD 인쇄 연동** — 외부 출판사 API 연동
-- [ ] **Supabase Auth 마이그레이션** — 현재 NextAuth → Supabase Auth 통합 검토
+### 🟢 장기 — 사업화
+- [ ] **POD 인쇄/제본 연동** — 외부 출판사 API → 실물 책 주문
+- [ ] **오디오북 변환** — TTS로 완성된 책을 음성 파일로 변환
+- [ ] **IP융복합 콘텐츠 제작** — 고양산업진흥원 사업계획서 기반 LED 전시 콘텐츠화
+- [ ] **B2B 기관 납품 모드** — 실버타운·병원용 회상치료 세션 관리
+- [ ] **다국어 지원** — 재외동포 시장 (영어·일어)
+- [ ] **Supabase Auth 마이그레이션** — NextAuth → Supabase Auth 통합 검토
 
 ---
 
@@ -495,9 +509,10 @@ git push origin main
 
 | 파일 | 내용 |
 |------|------|
-| `docs/mystory-progress-report.md` | Phase별 전체 진행 현황 |
+| `docs/mystory-progress-report.md` | Phase별 전체 진행 현황 + 미완성 항목 체크리스트 |
 | `docs/design-guide.md` | 디자인 시스템 가이드 (색상·타이포·애니메이션·레이아웃) |
 | `docs/token-optimization-strategies.md` | AI 토큰 최적화 전략 (슬라이딩 윈도우·하이브리드·압축) |
+| `docs/사업계획서_IP융복합콘텐츠제작지원_나의이야기.md` | 2026 고양산업진흥원 IP융복합 콘텐츠 제작 지원 사업계획서 |
 | `docs/mystory-ux-review.md` | UX 점검 + 상세 계획 |
 | `docs/mystory-dev-issues.md` | 관리자 STT 설정 API 상세 설계 |
 | `config/settings.json` | STT·UI 서비스 설정 (관리자 페이지에서 수정) |
