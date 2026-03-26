@@ -12,9 +12,12 @@ import { createBrowserClient } from '@/lib/supabase';
 export default function WritePage() {
   const router = useRouter();
   const { data: session } = useSession();
-  const { state, isSyncing, syncError, setChapterMode, setProse, setCurrentChapterIdx, markChapterDone, setFontSize, syncToDb, resetBook, setSTTMode, addMessage } = useBook();
+  const { state, isSyncing, syncError, setChapterMode, setProse, setCurrentChapterIdx, markChapterDone, setFontSize, syncToDb, resetBook, setSTTMode, addMessage, setTitle, setAuthor } = useBook();
   const [showSidebar, setShowSidebar] = useState(false);
   const [showFinish, setShowFinish] = useState(false);
+  const [showTitleEdit, setShowTitleEdit] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editAuthor, setEditAuthor] = useState('');
   const [maxDurationSec, setMaxDurationSec] = useState(120);
   const [interviewerToast, setInterviewerToast] = useState<{ chapterTitle: string; text: string } | null>(null);
 
@@ -311,7 +314,7 @@ export default function WritePage() {
           }}>
             {/* 사이드바 헤더 */}
             <div style={{ padding: '20px 20px 16px', borderBottom: `1px solid ${TOKENS.borderLight}` }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                 <p style={{ fontSize: 9, letterSpacing: 3, color: TOKENS.accent, textTransform: 'uppercase', fontFamily: TOKENS.sans, fontWeight: 600 }}>
                   Table of Contents
                 </p>
@@ -320,6 +323,81 @@ export default function WritePage() {
                   color: TOKENS.muted, fontSize: 18, lineHeight: 1, padding: '2px 4px',
                 }}>×</button>
               </div>
+
+              {/* 책 제목/저자 편집 */}
+              {showTitleEdit ? (
+                <div style={{ marginBottom: 12 }}>
+                  <input
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    placeholder="책 제목"
+                    style={{
+                      width: '100%', padding: '8px 10px', marginBottom: 6,
+                      border: `1.5px solid ${TOKENS.accent}`, borderRadius: 8,
+                      fontFamily: TOKENS.serif, fontSize: 13, color: TOKENS.text,
+                      background: '#FBF7F2', outline: 'none', boxSizing: 'border-box',
+                    }}
+                  />
+                  <input
+                    value={editAuthor}
+                    onChange={(e) => setEditAuthor(e.target.value)}
+                    placeholder="지은이"
+                    style={{
+                      width: '100%', padding: '8px 10px', marginBottom: 8,
+                      border: `1px solid ${TOKENS.border}`, borderRadius: 8,
+                      fontFamily: TOKENS.sans, fontSize: 12, color: TOKENS.subtext,
+                      background: '#FFF', outline: 'none', boxSizing: 'border-box',
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      onClick={() => {
+                        if (editTitle.trim()) setTitle(editTitle.trim());
+                        if (editAuthor.trim()) setAuthor(editAuthor.trim());
+                        setShowTitleEdit(false);
+                      }}
+                      style={{
+                        flex: 1, padding: '7px 0', background: TOKENS.accent, color: '#fff',
+                        border: 'none', borderRadius: 7, cursor: 'pointer',
+                        fontFamily: TOKENS.sans, fontSize: 12, fontWeight: 600,
+                      }}
+                    >저장</button>
+                    <button
+                      onClick={() => setShowTitleEdit(false)}
+                      style={{
+                        flex: 1, padding: '7px 0', background: 'none', color: TOKENS.muted,
+                        border: `1px solid ${TOKENS.border}`, borderRadius: 7, cursor: 'pointer',
+                        fontFamily: TOKENS.sans, fontSize: 12,
+                      }}
+                    >취소</button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => { setEditTitle(state.title); setEditAuthor(state.author); setShowTitleEdit(true); }}
+                  style={{
+                    width: '100%', textAlign: 'left', background: TOKENS.accentBg,
+                    border: `1px solid ${TOKENS.accentBorder}`, borderRadius: 8,
+                    padding: '8px 10px', marginBottom: 12, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontFamily: TOKENS.serif, fontSize: 13, color: TOKENS.text, fontWeight: 600, lineHeight: 1.4 }}>
+                      {state.title || '나의 이야기'}
+                    </div>
+                    {state.author && (
+                      <div style={{ fontFamily: TOKENS.sans, fontSize: 11, color: TOKENS.subtext, marginTop: 2 }}>
+                        {state.author}
+                      </div>
+                    )}
+                  </div>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={TOKENS.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                </button>
+              )}
               {/* 진행률 */}
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                 <span style={{ fontSize: 12, color: TOKENS.muted, fontFamily: TOKENS.sans }}>전체 진행</span>

@@ -223,10 +223,28 @@ export function BookProvider({ children }: { children: ReactNode }) {
     }
 
     // 회원 상태로 교체
-    setState(loadState(userId));
+    const migratedState = loadState(userId);
+    setState(migratedState);
     lastUserIdRef.current = userId;
     lastSyncedRef.current = '';
-  }, [userId, isHydrated]);
+
+    // 비회원 데이터가 있고 DB에 아직 저장되지 않은 경우 → DB 책 자동 생성
+    if (migratedState.chapters.length > 0 && !migratedState.bookId && isSupabaseConfigured()) {
+      fetch('/api/books', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: migratedState.title, author: migratedState.author }),
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.book?.id) {
+            setState((prev) => ({ ...prev, bookId: data.book.id }));
+            // bookId 설정 후 자동 동기화가 챕터 데이터를 DB에 올림
+          }
+        })
+        .catch(() => {}); // 조용히 무시 (다음 수동 저장 시 재시도 가능)
+    }
+  }, [userId, isHydrated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── localStorage 자동 저장 (500ms 디바운스) ── */
   useEffect(() => {

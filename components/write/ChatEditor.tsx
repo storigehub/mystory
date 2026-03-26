@@ -282,15 +282,16 @@ export default function ChatEditor({ chapter, chapterIdx, maxDurationSec = 120 }
         throw new Error(data.error || '산문 변환 실패');
       }
 
-      // 산문 저장 후 normal 모드로 전환
+      // 산문 저장 후 normal 모드로 전환 + 챕터 완성 처리
       setProse(chapterIdx, data.prose);
       setChapterMode(chapterIdx, 'normal');
+      markChapterDone(chapterIdx);
     } catch (err: any) {
       setAssembleError(err.message || '이야기 완성에 실패했습니다.');
     } finally {
       setIsAssembling(false);
     }
-  }, [isAssembling, chapter, state.author, chapterIdx, setProse, setChapterMode]);
+  }, [isAssembling, chapter, state.author, chapterIdx, setProse, setChapterMode, markChapterDone]);
 
   const send = useCallback(() => {
     if (isTypingRef.current) return;
