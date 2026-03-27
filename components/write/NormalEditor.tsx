@@ -295,7 +295,7 @@ export default function NormalEditor({ chapter, chapterIdx, maxDurationSec = 120
 
       {/* ── Toolbar ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', background: TOKENS.bg, borderBottom: `1px solid ${TOKENS.borderLight}`, flexShrink: 0 }}>
-        <input ref={fileRef} type="file" accept="image/*" onChange={onFileSelect} style={{ display: 'none' }} />
+        <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFileSelect} style={{ display: 'none' }} />
         <button onClick={() => handleAddPhoto(activeBidRef.current)} disabled={isUploading} style={toolBtn(isUploading)}>
           <PhotoIcon /><span>{isUploading ? '업로드 중...' : '사진'}</span>
         </button>

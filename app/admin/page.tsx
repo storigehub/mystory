@@ -13,6 +13,15 @@ interface BookRow {
   is_public: boolean;
 }
 
+interface UserRow {
+  userId: string;
+  bookCount: number;
+  publicBookCount: number;
+  firstSeen: string;
+  lastActive: string;
+  books: { id: string; title: string }[];
+}
+
 interface Stats {
   totalBooks: number;
   publicBooks: number;
@@ -62,6 +71,8 @@ export default function AdminPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [books, setBooks] = useState<BookRow[]>([]);
   const [search, setSearch] = useState('');
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [activeTab, setActiveTab] = useState<'books' | 'users'>('books');
 
   const [migrateCount, setMigrateCount] = useState<number | null>(null);
   const [migrating, setMigrating] = useState(false);
@@ -82,6 +93,11 @@ export default function AdminPage() {
       setBooks(data.books ?? []);
       setAuthed(true);
       setAuthError('');
+      // 사용자 목록 로드
+      fetch('/api/admin/users', { headers: { 'x-admin-password': pw } })
+        .then((r) => r.json())
+        .then((d) => setUsers(d.users ?? []))
+        .catch(() => {});
       // 마이그레이션 대기 사진 수 확인
       fetch('/api/admin/migrate-photos', { headers: { 'x-admin-password': pw } })
         .then((r) => r.json())
@@ -249,8 +265,27 @@ export default function AdminPage() {
           </div>
         )}
 
+        {/* 탭 */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
+          {(['books', 'users'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                padding: '8px 18px', borderRadius: 8, border: 'none',
+                background: activeTab === tab ? TOKENS.dark : TOKENS.card,
+                color: activeTab === tab ? '#FAFAF9' : TOKENS.subtext,
+                fontFamily: TOKENS.sans, fontSize: 13, cursor: 'pointer',
+                border: activeTab === tab ? 'none' : `1px solid ${TOKENS.border}`,
+              }}
+            >
+              {tab === 'books' ? `책 목록 (${books.length})` : `사용자 (${users.length})`}
+            </button>
+          ))}
+        </div>
+
         {/* 책 목록 */}
-        <div style={{ ...card }}>
+        {activeTab === 'books' && <div style={{ ...card }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
             <h2 style={{ fontSize: 13, letterSpacing: 2, color: TOKENS.muted, fontFamily: TOKENS.sans, margin: 0 }}>
               전체 책 목록
@@ -342,7 +377,80 @@ export default function AdminPage() {
               {filtered.length}권 표시
             </p>
           )}
-        </div>
+        </div>}
+
+        {/* 사용자 목록 */}
+        {activeTab === 'users' && <div style={{ ...card }}>
+          <h2 style={{ fontSize: 13, letterSpacing: 2, color: TOKENS.muted, fontFamily: TOKENS.sans, margin: '0 0 16px' }}>
+            사용자 현황
+          </h2>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: TOKENS.sans, fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: `1px solid ${TOKENS.borderLight}` }}>
+                  {['사용자 ID', '책 수', '공개', '첫 가입', '마지막 활동', '작품 목록'].map((h) => (
+                    <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: TOKENS.muted, fontWeight: 500, whiteSpace: 'nowrap' }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {users.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '24px', textAlign: 'center', color: TOKENS.muted }}>
+                      사용자 없음
+                    </td>
+                  </tr>
+                ) : (
+                  users.map((u) => (
+                    <tr key={u.userId} style={{ borderBottom: `1px solid ${TOKENS.borderLight}` }}>
+                      <td style={{ padding: '10px 12px', maxWidth: 180 }}>
+                        <span style={{ fontSize: 11, color: TOKENS.subtext, fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                          {u.userId.slice(0, 20)}…
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 12px', fontWeight: 600, color: TOKENS.text }}>
+                        {u.bookCount}
+                      </td>
+                      <td style={{ padding: '10px 12px', color: u.publicBookCount > 0 ? '#16a34a' : TOKENS.muted }}>
+                        {u.publicBookCount}
+                      </td>
+                      <td style={{ padding: '10px 12px', color: TOKENS.muted, whiteSpace: 'nowrap' }}>
+                        {formatDate(u.firstSeen)}
+                      </td>
+                      <td style={{ padding: '10px 12px', color: TOKENS.muted, whiteSpace: 'nowrap' }}>
+                        {formatDate(u.lastActive)}
+                      </td>
+                      <td style={{ padding: '10px 12px', maxWidth: 200 }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                          {u.books.slice(0, 3).map((b) => (
+                            <a
+                              key={b.id}
+                              href={`/shared/${b.id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{ fontSize: 11, color: TOKENS.accent, textDecoration: 'none', background: TOKENS.accentBg, padding: '2px 6px', borderRadius: 4 }}
+                            >
+                              {b.title.slice(0, 10)}{b.title.length > 10 ? '…' : ''}
+                            </a>
+                          ))}
+                          {u.books.length > 3 && (
+                            <span style={{ fontSize: 11, color: TOKENS.muted }}>+{u.books.length - 3}</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          <p style={{ fontSize: 12, color: TOKENS.muted, fontFamily: TOKENS.sans, marginTop: 12, textAlign: 'right' }}>
+            총 {users.length}명의 회원이 책을 작성했습니다
+          </p>
+        </div>}
+
       </div>
     </div>
   );

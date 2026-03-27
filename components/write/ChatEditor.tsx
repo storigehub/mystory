@@ -119,6 +119,9 @@ export default function ChatEditor({ chapter, chapterIdx, maxDurationSec = 120 }
   const fileRef = useRef<HTMLInputElement>(null);
   const composingRef = useRef(false);
   const questionIndexRef = useRef(chapter.messages.filter((m) => m.type === 'user').length);
+  const summaryRef = useRef<string>('');   // 이전 대화 요약 (방안 A)
+  const turnCountRef = useRef(0);          // 대화 턴 카운터 (요약 갱신 주기용)
+  const SUMMARY_THRESHOLD = 6;            // 이 턴 이후부터 요약 생성 시작
   const isTypingRef = useRef(false);
   const recognitionRef = useRef<any>(null);
   const inputBeforeSTT = useRef('');
@@ -225,6 +228,24 @@ export default function ChatEditor({ chapter, chapterIdx, maxDurationSec = 120 }
     setTimeout(() => endRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
   }, [chapter.messages.length, isTyping]);
 
+  // 대화 요약 갱신 (비동기, 현재 응답에 영향 없음)
+  const updateSummary = useCallback(async () => {
+    try {
+      const msgs = chapter.messages
+        .filter((m) => m.type === 'user' || m.type === 'assistant')
+        .map((m) => ({ role: m.type === 'user' ? 'user' : 'assistant', content: m.text }));
+      const res = await fetch('/api/ai/summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: msgs, topicTitle: chapter.title }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        summaryRef.current = data.summary || '';
+      }
+    } catch {}
+  }, [chapter]);
+
   const callAI = useCallback(
     async (userText: string, isDeep: boolean): Promise<string> => {
       try {
@@ -241,6 +262,7 @@ export default function ChatEditor({ chapter, chapterIdx, maxDurationSec = 120 }
             messages,
             topicTitle: chapter.title,
             topicId: chapter.tid,
+            summary: summaryRef.current,   // 방안 A: 이전 대화 요약 포함
           }),
         });
         if (!res.ok) throw new Error(`API error: ${res.status}`);
@@ -257,7 +279,7 @@ export default function ChatEditor({ chapter, chapterIdx, maxDurationSec = 120 }
         return `${pick(REACTIONS)}\n\n${nextQ}`;
       }
     },
-    [chapter]
+    [chapter, updateSummary]
   );
 
   // ── 이야기 완성하기 (산문 변환) ──
@@ -316,8 +338,13 @@ export default function ChatEditor({ chapter, chapterIdx, maxDurationSec = 120 }
       addMessage(chapterIdx, { id: uid(), type: 'assistant', text: aiText, timestamp: Date.now() });
       setIsTyping(false);
       isTypingRef.current = false;
+      // 방안 A: 3턴마다 요약 갱신 (SUMMARY_THRESHOLD 이후)
+      turnCountRef.current += 1;
+      if (turnCountRef.current >= SUMMARY_THRESHOLD && turnCountRef.current % 3 === 0) {
+        updateSummary();
+      }
     });
-  }, [input, isListening, deepMode, chapterIdx, addMessage, callAI]);
+  }, [input, isListening, deepMode, chapterIdx, addMessage, callAI, updateSummary]);
 
   sendFnRef.current = send;
 
@@ -621,6 +648,7 @@ export default function ChatEditor({ chapter, chapterIdx, maxDurationSec = 120 }
           ref={fileRef}
           type="file"
           accept="image/*"
+          capture="environment"
           onChange={onFileSelect}
           style={{ display: 'none' }}
         />

@@ -40,13 +40,30 @@ function sanitize(text: string): string {
   });
 }
 
+// ── 토큰 최적화 설정 ──
+const WINDOW_SIZE = 4;      // 원문으로 전송할 최근 메시지 수 (방안 A)
+const COMPRESS_CHARS = 80;  // 오래된 메시지 압축 글자 수 (방안 C)
+
+/** 방안 C+A 통합: 오래된 메시지는 80자로 압축, 최근 WINDOW_SIZE개는 원문 유지 */
+function compressMessages(messages: { role: string; content: string }[]) {
+  return messages.map((m, i) => {
+    if (i >= messages.length - WINDOW_SIZE) return m; // 최근 N개 원문 유지
+    const content = m.content.length > COMPRESS_CHARS
+      ? m.content.slice(0, COMPRESS_CHARS) + '…'
+      : m.content;
+    return { ...m, content };
+  });
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { messages, topicTitle, topicId } = await req.json();
+    const { messages, topicTitle, topicId, summary } = await req.json();
 
+    const compressed = compressMessages(messages);
     const chatMessages: OpenAI.ChatCompletionMessageParam[] = [
       { role: "system", content: SYSTEM_PROMPT + `\n\n현재 주제: "${topicTitle}" (${topicId})` },
-      ...messages.map((m: { role: string; content: string }) => ({
+      ...(summary ? [{ role: "system" as const, content: `[이전 대화 요약]\n${summary}` }] : []),
+      ...compressed.map((m: { role: string; content: string }) => ({
         role: m.role as "user" | "assistant",
         content: sanitize(m.content),
       })),
