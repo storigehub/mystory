@@ -1,6 +1,6 @@
 # 나의이야기 (My Story) — Claude Code 인계 문서
 
-> **최종 업데이트**: 2026-03-24 (전체 현황 리뷰 완료)
+> **최종 업데이트**: 2026-03-27 (Phase 10 완료)
 > **작성 환경**: Claude Code (CLI) — claude-sonnet-4-6
 > ⚠️ 모든 개발은 Claude Code에서 `/mystory` 폴더를 직접 편집한다.
 
@@ -206,6 +206,23 @@ config/
   - `/api/books/[id]/invite`: 서버에서 타입별 토큰 자동 조회 (클라이언트 토큰 전달 불필요)
   - `/book/page.tsx`: 열람 링크 / 인터뷰어 링크 버튼 각각 독립 생성·복사·해제
 
+### Phase 10 (Claude Code — 2026-03-27)
+- [x] **책 제목/저자 편집 UI** (`app/write/page.tsx` 사이드바)
+  - 사이드바 상단에 책 제목+저자 표시 버튼 추가 (편집 아이콘 포함)
+  - 클릭 시 인라인 제목/저자 입력창으로 전환 (`showTitleEdit` 상태)
+  - 저장: `setTitle()` / `setAuthor()` 컨텍스트 메서드 호출 → 자동 DB 동기화
+- [x] **챕터 완성 상태 자동화** (`components/write/ChatEditor.tsx`)
+  - `handleAssemble()` 성공 후 `markChapterDone(chapterIdx)` 자동 호출 추가
+  - "이야기 완성하기" → 산문 변환 + 챕터 완료 처리 일원화
+- [x] **비회원 → 회원 데이터 이전** (`lib/book-context.tsx`)
+  - 마이그레이션 useEffect: 챕터 있고 bookId 없으면 `/api/books` POST 자동 호출
+  - bookId 설정 → 기존 2초 디바운스 자동 동기화가 챕터 전체 DB 업로드
+- [x] **OGP 메타태그 전체 페이지 적용**
+  - `app/layout.tsx`: `metadataBase` + og:title/description/image/url + twitter:card
+  - `app/my/layout.tsx`: 신규 생성 (내 책 보관함 전용 OGP)
+  - `app/book/layout.tsx`: 신규 생성 (책 미리보기 전용 OGP)
+  - og:image: Pexels CDN 히어로 이미지 (1200×800)
+
 ---
 
 ## ⚠️ 설정 필요 항목 (개발 재개 전 확인)
@@ -226,7 +243,7 @@ ALTER TABLE books ADD COLUMN IF NOT EXISTS share_token uuid;
 ALTER TABLE books ADD COLUMN IF NOT EXISTS interviewer_token uuid;
 -- Phase 9 (Supabase MCP로 실행 완료)
 CREATE TABLE IF NOT EXISTS site_config (id text PRIMARY KEY, data jsonb DEFAULT '{}', updated_at timestamptz DEFAULT now());
--- ⚠️ 아직 미실행: messages.type 체크 제약 수정 (위 항목 2 참고)
+-- ✅ messages.type 체크 제약 수정 완료 (2026-03-23)
 ```
 
 ### 5. Supabase Realtime 설정 (Phase 7, 이미 완료)
@@ -433,12 +450,15 @@ interface Message {
 - [ ] **base64 사진 마이그레이션 실행** — 관리자 대시보드 → 마이그레이션 버튼 클릭
 
 ### 🟡 단기 — UX 보완
-- [ ] **책 제목/저자 편집 UI** — /book 또는 /write 내에서 제목·저자 수정 가능하게
-- [ ] **챕터 완성 상태 자동화** — "이야기 완성하기" 클릭 시 `is_done = true` 자동 처리
-- [ ] **비회원 → 회원 전환 시 데이터 이전** — 로그인 후 localStorage 데이터를 DB로 이전
-- [ ] **OGP 메타태그 전체 페이지 적용** — 랜딩 / /my / /book 페이지 og:title, og:image 추가
+- [x] **책 제목/저자 편집 UI** ✅ 완료 — write 사이드바 인라인 편집 (Phase 10)
+- [x] **챕터 완성 상태 자동화** ✅ 완료 — handleAssemble 시 markChapterDone 자동 호출 (Phase 10)
+- [x] **비회원 → 회원 전환 시 데이터 이전** ✅ 완료 — 로그인 시 DB 책 자동 생성 (Phase 10)
+- [x] **OGP 메타태그 전체 페이지 적용** ✅ 완료 — 랜딩/my/book 모두 적용 (Phase 10)
 - [ ] **Resend 발신자 도메인 인증** — `noreply@[커스텀도메인]` (Resend 대시보드 → Domains)
 - [ ] **OpenAI quota 관리** — 소진 시 알림 + quota 충전
+- [ ] **AI 토큰 최적화 1단계** — 방안 C: 오래된 메시지 80자 truncate (docs/token-optimization-strategies.md)
+- [ ] **모바일 사진 업로드** — `capture="environment"` 속성으로 카메라 직접 촬영 연동
+- [ ] **/book 페이지 제목/저자 편집** — 책 미리보기 화면에서도 제목 수정 가능하게
 
 ### 🟠 중기 — 기능 확장
 - [ ] **결제 시스템** — Stripe 또는 토스페이 연동 (구독/단건 결제 모델)
