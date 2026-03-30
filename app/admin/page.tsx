@@ -78,6 +78,14 @@ export default function AdminPage() {
   const [migrating, setMigrating] = useState(false);
   const [migrateResult, setMigrateResult] = useState<string | null>(null);
 
+  const [openaiStatus, setOpenaiStatus] = useState<{
+    status: 'ok' | 'invalid' | 'no_key' | 'loading';
+    model?: string;
+    maskedKey?: string | null;
+    usage?: { totalCost: number; currency: string; startDate: string; endDate: string } | null;
+    balance?: { available: number; currency: string } | null;
+  }>({ status: 'loading' });
+
   const fetchDashboard = async (pw: string) => {
     setLoading(true);
     try {
@@ -103,6 +111,11 @@ export default function AdminPage() {
         .then((r) => r.json())
         .then((d) => setMigrateCount(d.pendingCount ?? 0))
         .catch(() => {});
+      // OpenAI 사용량 조회
+      fetch('/api/admin/openai-usage', { headers: { 'x-admin-password': pw } })
+        .then((r) => r.json())
+        .then((d) => setOpenaiStatus(d))
+        .catch(() => setOpenaiStatus({ status: 'invalid' }));
     } catch {
       setAuthError('서버 오류');
     } finally {
@@ -231,6 +244,72 @@ export default function AdminPage() {
           </div>
         )}
 
+        {/* OpenAI 상태 */}
+        <div style={{ ...card, marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 500, fontFamily: TOKENS.sans, color: TOKENS.text, margin: '0 0 2px' }}>
+                OpenAI API 상태
+              </p>
+              <p style={{ fontSize: 12, color: TOKENS.muted, fontFamily: TOKENS.sans, margin: 0 }}>
+                {openaiStatus.maskedKey || '키 없음'} &nbsp;|&nbsp; 모델: {openaiStatus.model || '-'}
+              </p>
+            </div>
+            <div style={{ flex: 1 }} />
+            <span style={{
+              fontSize: 11, padding: '3px 10px', borderRadius: 20, fontFamily: TOKENS.sans,
+              background: openaiStatus.status === 'ok' ? '#F0FDF4' : openaiStatus.status === 'loading' ? TOKENS.warm : '#FEF2F2',
+              color: openaiStatus.status === 'ok' ? '#16a34a' : openaiStatus.status === 'loading' ? TOKENS.muted : '#c0392b',
+              border: `1px solid ${openaiStatus.status === 'ok' ? '#bbf7d0' : openaiStatus.status === 'loading' ? TOKENS.borderLight : '#fecaca'}`,
+            }}>
+              {openaiStatus.status === 'ok' ? '연결됨' : openaiStatus.status === 'loading' ? '확인 중…' : openaiStatus.status === 'no_key' ? '키 없음' : '연결 실패'}
+            </span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
+            <div style={{ background: TOKENS.warm, borderRadius: 8, padding: '12px 16px' }}>
+              <p style={{ fontSize: 11, color: TOKENS.muted, fontFamily: TOKENS.sans, letterSpacing: 1, margin: '0 0 4px' }}>이번 달 사용 비용</p>
+              <p style={{ fontSize: 22, fontWeight: 600, fontFamily: TOKENS.serif, color: TOKENS.text, margin: 0 }}>
+                {openaiStatus.usage != null
+                  ? `$${openaiStatus.usage.totalCost.toFixed(2)}`
+                  : openaiStatus.status === 'loading' ? '…' : '조회 불가'}
+              </p>
+              {openaiStatus.usage && (
+                <p style={{ fontSize: 11, color: TOKENS.muted, fontFamily: TOKENS.sans, margin: '2px 0 0' }}>
+                  {openaiStatus.usage.startDate} ~ {openaiStatus.usage.endDate}
+                </p>
+              )}
+            </div>
+            <div style={{ background: TOKENS.warm, borderRadius: 8, padding: '12px 16px' }}>
+              <p style={{ fontSize: 11, color: TOKENS.muted, fontFamily: TOKENS.sans, letterSpacing: 1, margin: '0 0 4px' }}>월 한도</p>
+              <p style={{ fontSize: 22, fontWeight: 600, fontFamily: TOKENS.serif, color: TOKENS.text, margin: 0 }}>
+                {openaiStatus.balance != null
+                  ? `$${openaiStatus.balance.available.toFixed(0)}`
+                  : openaiStatus.status === 'loading' ? '…' : '조회 불가'}
+              </p>
+              <p style={{ fontSize: 11, color: TOKENS.muted, fontFamily: TOKENS.sans, margin: '2px 0 0' }}>hard limit</p>
+            </div>
+            <div style={{ background: TOKENS.warm, borderRadius: 8, padding: '12px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <p style={{ fontSize: 11, color: TOKENS.muted, fontFamily: TOKENS.sans, letterSpacing: 1, margin: '0 0 8px' }}>관리 바로가기</p>
+              <a
+                href="https://platform.openai.com/usage"
+                target="_blank"
+                rel="noreferrer"
+                style={{ fontSize: 12, color: '#7C3AED', textDecoration: 'none', fontFamily: TOKENS.sans }}
+              >
+                사용량 대시보드 ↗
+              </a>
+              <a
+                href="https://platform.openai.com/api-keys"
+                target="_blank"
+                rel="noreferrer"
+                style={{ fontSize: 12, color: TOKENS.accent, textDecoration: 'none', fontFamily: TOKENS.sans, marginTop: 4 }}
+              >
+                API 키 관리 ↗
+              </a>
+            </div>
+          </div>
+        </div>
+
         {/* 사진 마이그레이션 */}
         {migrateCount !== null && (
           <div style={{ ...card, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
@@ -272,7 +351,7 @@ export default function AdminPage() {
               key={tab}
               onClick={() => setActiveTab(tab)}
               style={{
-                padding: '8px 18px', borderRadius: 8, border: 'none',
+                padding: '8px 18px', borderRadius: 8,
                 background: activeTab === tab ? TOKENS.dark : TOKENS.card,
                 color: activeTab === tab ? '#FAFAF9' : TOKENS.subtext,
                 fontFamily: TOKENS.sans, fontSize: 13, cursor: 'pointer',

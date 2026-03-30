@@ -97,10 +97,15 @@ function renderParagraphs(text: string, fontSize: number, lineHeight: number, is
 ───────────────────────────────────────────────────────────────── */
 export default function BookPage() {
   const router = useRouter();
-  const { state, setCoverTemplateId } = useBook();
+  const { state, setCoverTemplateId, setTitle, setAuthor } = useBook();
 
   const [viewMode, setViewMode] = useState<'read' | 'flip'>('read');
   const [readPct, setReadPct] = useState(0);
+
+  /* 제목/저자 편집 */
+  const [showTitleEdit, setShowTitleEdit] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editAuthor, setEditAuthor] = useState('');
 
   /* 표지 편집 */
   const [showCoverEditor, setShowCoverEditor] = useState(false);
@@ -403,14 +408,82 @@ export default function BookPage() {
 
         {/* 제목 */}
         <div style={{ flex: 1, overflow: 'hidden', textAlign: 'center' }}>
-          <span style={{
-            fontSize: 14, fontWeight: 500, color: TOKENS.text,
-            letterSpacing: '-0.02em', fontFamily: TOKENS.serif,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            display: 'block',
-          }}>
-            {state.title || '나의 이야기'}
-          </span>
+          {showTitleEdit ? (
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'center' }}>
+              <input
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="책 제목"
+                autoFocus
+                style={{
+                  fontSize: 13, fontFamily: TOKENS.serif, color: TOKENS.text,
+                  border: `1px solid ${ACCENT_BORDER}`, borderRadius: 6, padding: '3px 8px',
+                  background: ACCENT_BG, outline: 'none', width: 120,
+                }}
+              />
+              <input
+                value={editAuthor}
+                onChange={(e) => setEditAuthor(e.target.value)}
+                placeholder="지은이"
+                style={{
+                  fontSize: 13, fontFamily: TOKENS.serif, color: TOKENS.text,
+                  border: `1px solid ${ACCENT_BORDER}`, borderRadius: 6, padding: '3px 8px',
+                  background: ACCENT_BG, outline: 'none', width: 80,
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    if (editTitle.trim()) setTitle(editTitle.trim());
+                    if (editAuthor.trim()) setAuthor(editAuthor.trim());
+                    setShowTitleEdit(false);
+                  } else if (e.key === 'Escape') {
+                    setShowTitleEdit(false);
+                  }
+                }}
+              />
+              <button
+                onClick={() => {
+                  if (editTitle.trim()) setTitle(editTitle.trim());
+                  if (editAuthor.trim()) setAuthor(editAuthor.trim());
+                  setShowTitleEdit(false);
+                }}
+                style={{
+                  fontSize: 11, padding: '3px 8px', borderRadius: 6,
+                  background: ACCENT, color: '#fff', border: 'none', cursor: 'pointer',
+                }}
+              >저장</button>
+              <button
+                onClick={() => setShowTitleEdit(false)}
+                style={{
+                  fontSize: 11, padding: '3px 8px', borderRadius: 6,
+                  background: TOKENS.card, color: TOKENS.subtext,
+                  border: `1px solid ${TOKENS.border}`, cursor: 'pointer',
+                }}
+              >취소</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => { setEditTitle(state.title || ''); setEditAuthor(state.author || ''); setShowTitleEdit(true); }}
+              title="제목/저자 편집"
+              style={{
+                fontSize: 14, fontWeight: 500, color: TOKENS.text,
+                letterSpacing: '-0.02em', fontFamily: TOKENS.serif,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                display: 'flex', alignItems: 'center', gap: 4,
+                background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px',
+                borderRadius: 6, maxWidth: '100%',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = ACCENT_BG)}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+            >
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {state.title || '나의 이야기'}
+              </span>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={TOKENS.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* 우측 액션 */}
