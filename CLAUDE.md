@@ -1,6 +1,6 @@
 # 나의이야기 (My Story) — Claude Code 인계 문서
 
-> **최종 업데이트**: 2026-03-27 (Phase 10 완료)
+> **최종 업데이트**: 2026-03-30 (Phase 11 완료)
 > **작성 환경**: Claude Code (CLI) — claude-sonnet-4-6
 > ⚠️ 모든 개발은 Claude Code에서 `/mystory` 폴더를 직접 편집한다.
 
@@ -222,6 +222,26 @@ config/
   - `app/my/layout.tsx`: 신규 생성 (내 책 보관함 전용 OGP)
   - `app/book/layout.tsx`: 신규 생성 (책 미리보기 전용 OGP)
   - og:image: Pexels CDN 히어로 이미지 (1200×800)
+
+### Phase 11 (Claude Code — 2026-03-30)
+- [x] **AI 토큰 최적화 방안 C** (`app/api/ai/chat/route.ts`)
+  - `WINDOW_SIZE=4`, `COMPRESS_CHARS=80` — 최근 4개 제외 오래된 메시지 80자 압축
+  - `compressMessages()` 함수로 토큰 비용 절감
+- [x] **AI 토큰 최적화 방안 A** (`components/write/ChatEditor.tsx`)
+  - `summaryRef`, `turnCountRef`, `SUMMARY_THRESHOLD=6`
+  - 6턴 이후 3턴마다 `/api/ai/summarize` 호출 → 요약 시스템 메시지 주입
+  - `api/ai/summarize/route.ts`: 신규 — 대화를 100자 이내 한국어 키워드로 요약
+- [x] **모바일 카메라** (`components/write/ChatEditor.tsx`, `NormalEditor.tsx`)
+  - 파일 입력 `<input>` 에 `capture="environment"` 속성 추가 → 카메라 직접 촬영
+- [x] **관리자 사용자 관리** (`app/api/admin/users/route.ts`, `app/admin/page.tsx`)
+  - books 테이블 user_id 집계 → 사용자별 책 수/공개/가입일/마지막활동/작품목록
+  - 관리자 대시보드에 "사용자" 탭 추가 (books ↔ users 탭 전환)
+- [x] **/book 페이지 제목/저자 편집** (`app/book/page.tsx`)
+  - 헤더 제목을 클릭 가능한 버튼으로 교체 (연필 아이콘)
+  - 클릭 시 인라인 제목+저자 입력창 전환 → 저장 시 setTitle/setAuthor 자동 DB 동기화
+- [x] **OpenAI Quota 관리 대시보드** (`app/api/admin/openai-usage/route.ts`, `app/admin/page.tsx`)
+  - API 키 유효성 확인 (models 엔드포인트), 이번 달 사용 비용, 월 한도 표시
+  - 관리자 대시보드 상단에 OpenAI 상태 카드 추가
 
 ---
 
@@ -454,20 +474,17 @@ interface Message {
 - [x] **챕터 완성 상태 자동화** ✅ 완료 — handleAssemble 시 markChapterDone 자동 호출 (Phase 10)
 - [x] **비회원 → 회원 전환 시 데이터 이전** ✅ 완료 — 로그인 시 DB 책 자동 생성 (Phase 10)
 - [x] **OGP 메타태그 전체 페이지 적용** ✅ 완료 — 랜딩/my/book 모두 적용 (Phase 10)
+- [x] **AI 토큰 최적화 (방안 C+A)** ✅ 완료 — 오래된 메시지 압축 + 슬라이딩 윈도우+요약 (Phase 11)
+- [x] **모바일 사진 업로드** ✅ 완료 — capture="environment" 속성 추가 (Phase 11)
+- [x] **OpenAI quota 관리** ✅ 완료 — 관리자 대시보드 OpenAI 상태 카드 (Phase 11)
+- [x] **/book 페이지 제목/저자 편집** ✅ 완료 — 책 미리보기 헤더 클릭 인라인 편집 (Phase 11)
 - [ ] **Resend 발신자 도메인 인증** — `noreply@[커스텀도메인]` (Resend 대시보드 → Domains)
-- [ ] **OpenAI quota 관리** — 소진 시 알림 + quota 충전
-- [ ] **AI 토큰 최적화 1단계** — 방안 C: 오래된 메시지 80자 truncate (docs/token-optimization-strategies.md)
-- [ ] **모바일 사진 업로드** — `capture="environment"` 속성으로 카메라 직접 촬영 연동
-- [ ] **/book 페이지 제목/저자 편집** — 책 미리보기 화면에서도 제목 수정 가능하게
 
 ### 🟠 중기 — 기능 확장
 - [ ] **결제 시스템** — Stripe 또는 토스페이 연동 (구독/단건 결제 모델)
-- [ ] **AI 토큰 최적화** — `docs/token-optimization-strategies.md` 참고
-  - 1단계: 방안 C (오래된 메시지 80자 truncate, 코드 5줄)
-  - 2단계: 방안 A (슬라이딩 윈도우 + 요약 컨텍스트)
 - [ ] **가족 초대 이메일 다중 발송** — 현재 1건 → 여러 명 동시 발송 UI
 - [ ] **챕터 간 문맥 연결** — 전체 생애사 맥락을 AI가 요약·연결하는 기능
-- [ ] **관리자 사용자 관리** — 회원 탈퇴·이메일 발송 기능
+- [ ] **관리자 회원 관리 고도화** — 탈퇴·강제 삭제·이메일 발송 기능
 
 ### 🟢 장기 — 사업화
 - [ ] **POD 인쇄/제본 연동** — 외부 출판사 API → 실물 책 주문
